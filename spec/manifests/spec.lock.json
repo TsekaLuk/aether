@@ -21,9 +21,9 @@
       "sha256": "74a4e81754745362cb732ddd9de195bb1884d8d960262e3bd0000bfcc15cbc06"
     },
     {
-      "path": "lakefile.toml",
-      "bytes": 143,
-      "sha256": "8f2447a4f6f9260cf727116bee629a05611a930b7a3c561b1e2a63d491d85e98"
+      "path": "lakefile.lean",
+      "bytes": 138,
+      "sha256": "914744adafdfb740536296f3426e3fc69399a69a870c88d48bd47b79f9423cf2"
     },
     {
       "path": "lean-toolchain",
@@ -273,8 +273,8 @@
     {
       "path": "tools/validate-spec.mjs",
       "bytes": 30179,
-      "sha256": "374429a661267c95c5c0f40cd0dfce3cf8b5e35800506c1e3e03df4116147b6f"
+      "sha256": "e2ea3f938b999e89b513ea2709e2621decbf392d9f72b3f517c663c20b12fccc"
     }
   ],
-  "root_hash": "90981a12893eab5b439b6de3bd0a154e4fbe8a7a909ed46b074328aa70ce38f1"
+  "root_hash": "c22b80ffd22a03f01fd95df63f4d684f84f19abd452929260813e76ac82054b2"
 }

@@ -436,7 +436,7 @@ if (problems.length > 0) {
 
 const lockFiles = [
   "package.json",
-  "lakefile.toml",
+  "lakefile.lean",
   "lake-manifest.json",
   "lean-toolchain",
   "docs/prd/Aether-PRD-v0.3.md",
