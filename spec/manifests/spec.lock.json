@@ -37,8 +37,8 @@
     },
     {
       "path": "spec/README.md",
-      "bytes": 989,
-      "sha256": "822de3a8e274450de7cb9a2ae1332348cdb030d8de7b7beae1f1fea8dbd6a1df"
+      "bytes": 1065,
+      "sha256": "cbb14edd0ac90d3141f0fa591c1ffbd81d0a5c1752117b93896735b7c46dddff"
     },
     {
       "path": "spec/asr/K0.schema.json",
@@ -46,9 +46,19 @@
       "sha256": "4f1e4fb16cbf51be931a659d86d6022505156c4ad50a7f8290b99517ea9fb60a"
     },
     {
+      "path": "spec/asr/K0.source-map.md",
+      "bytes": 1034,
+      "sha256": "78f5fcd2350f706639b13f2154068023794ab068151310f7b213eec614ee2e64"
+    },
+    {
+      "path": "spec/asr/K0.source-map.schema.json",
+      "bytes": 1889,
+      "sha256": "26e934deb5155732654b0b1caa511e09abf9271156a08e0e32e4bbd7adb24e1d"
+    },
+    {
       "path": "spec/asr/README.md",
-      "bytes": 633,
-      "sha256": "ab2c67aa0cfccf43693ff619765d0a85c45036db0ff900b0eaa143880be07807"
+      "bytes": 793,
+      "sha256": "8e8842403f381f58334b48fb4663f97d4cd97b87885789a6defd9044e2446697"
     },
     {
       "path": "spec/conformance/README.md",
@@ -67,8 +77,8 @@
     },
     {
       "path": "spec/conformance/layer/K0.json",
-      "bytes": 3794,
-      "sha256": "85dbf61287e82288704aaebfeaae4306e21b6c191702351b05148daf29c78aad"
+      "bytes": 4634,
+      "sha256": "3e86e8a55931b12fb4d5659cab32952355d6808fbcae1ba98022d10be81b7e43"
     },
     {
       "path": "spec/conformance/metamorphic/README.md",
@@ -92,23 +102,23 @@
     },
     {
       "path": "spec/conformance/resolution/K0.json",
-      "bytes": 16720,
-      "sha256": "4d2bb88ae66d85b2f717db662fd0d830a19d81cac98b85563b99035e224f0f59"
+      "bytes": 19217,
+      "sha256": "38c61d89f00b10ca27fb932eb964febbd944806968263fb0380d4ed5116839a1"
     },
     {
       "path": "spec/conformance/resolution/README.md",
-      "bytes": 448,
-      "sha256": "cf5e0dcd25c9ca472aa01f86d2816ea963adbb7320f8428844465885645fd9d4"
+      "bytes": 780,
+      "sha256": "0017dfaebc2bb6d530174ed9e43960d0849a43be8a22736faa7457c000928292"
     },
     {
       "path": "spec/conformance/source/README.md",
-      "bytes": 624,
-      "sha256": "463bac0fab556b1afbeb2b24b296de82548a2717c7e7383866bf3e24c81a1dff"
+      "bytes": 857,
+      "sha256": "077199ee5bdd7253f651599f547ea87b70570228571b5e1ebc0e19ee1931e2d8"
     },
     {
       "path": "spec/conformance/source/cases.json",
-      "bytes": 4445,
-      "sha256": "c0ab0d9ab3b1f52e19527fc7dca8fb4713984a83cecf582cc16ca189b5ab5ca7"
+      "bytes": 4722,
+      "sha256": "5b7609dcf02446adea75f0576ff5706e1600e2886c40664532adb34621f9ab37"
     },
     {
       "path": "spec/constitution/K0.md",
@@ -176,19 +186,24 @@
       "sha256": "dfbd10b1865285ee0efc0e07a7d7315ea0390ed58f2d882569a923b36e29abfd"
     },
     {
+      "path": "spec/decisions/LDR-0007-k0-source-provenance.json",
+      "bytes": 1440,
+      "sha256": "e1a4cf284882a5a492bef22226ee870bc794d81b4687cba2bf317ed88a467ad3"
+    },
+    {
       "path": "spec/grammar/K0.ebnf",
       "bytes": 6216,
       "sha256": "b4d1bf4354bcae9bfc7e8a5063e0b47f0d10a0d57ad19ca491c5154fa90fa45d"
     },
     {
       "path": "spec/lexical/K0.md",
-      "bytes": 2547,
-      "sha256": "84b71a8ae2e92a87797ad3c54e9dc7678d34396033d94df648f8bb3cafa50303"
+      "bytes": 2694,
+      "sha256": "3e8da70cea9455970fee32668f7c5f72f9e8d3f6bcab6c7a3eb97acaf872a314"
     },
     {
       "path": "spec/manifests/package.json",
-      "bytes": 979,
-      "sha256": "bba941f3b5d9b266f0fbac23be65c693664cba41356144fa1c730facfce14d0b"
+      "bytes": 957,
+      "sha256": "04dbc537c8be11bdda9cbb784a60d6b25681f3b6cc49c6ede8c214fbe1b7bbc9"
     },
     {
       "path": "spec/manifests/package.schema.json",
@@ -246,14 +261,19 @@
       "sha256": "8088c586d99156e888b2f5732acef00883d57b665ba2465536384deffb1fb22c"
     },
     {
+      "path": "spec/proposals/LCP-0003-k0-source-provenance.md",
+      "bytes": 8973,
+      "sha256": "5f96adc70d6ab56c8f6d640b7b1f0b2b87f74ff2171941d4437aaa0a7ea36067"
+    },
+    {
       "path": "spec/proposals/README.md",
-      "bytes": 568,
-      "sha256": "559cd4c64c90d9d8ea85a35b2d773846fda32b2ead28b7f89522301d00d24d6a"
+      "bytes": 705,
+      "sha256": "34f58844ef5a474360a932d3dc4a264bced954b3aa8aa33b23f852e46425f10b"
     },
     {
       "path": "spec/rules/K0.json",
-      "bytes": 13815,
-      "sha256": "a2e3ede60bbfa5a336fbba196d48f269d8e6c52bad8350af4d4611f050b82afe"
+      "bytes": 15220,
+      "sha256": "cc2992ff011c43e3c585bb93e9b75830ccc3731568f307cac21f7201893477b5"
     },
     {
       "path": "spec/targets/k0-reference-64.json",
@@ -292,29 +312,29 @@
     },
     {
       "path": "tools/parser-node.mjs",
-      "bytes": 21210,
-      "sha256": "6c08380503efd63b0f6c657be4cf2d87a4a037b410de15e5a63e5c439a9aeb3b"
+      "bytes": 25295,
+      "sha256": "014460dd62a1b7142e92960e2ac116e3741f0297ca961400d7fb6018b93c5fde"
     },
     {
       "path": "tools/parser-python.py",
-      "bytes": 23801,
-      "sha256": "5c35f6c7d217f6f0ab000a4559641e62ca67bd602002825838b0c0a5cb7d0118"
+      "bytes": 28486,
+      "sha256": "528b2b3c906dbb22dda8350ebe932d540175ce15d5c88ffdd56c9284868db8ea"
     },
     {
       "path": "tools/resolver-node.mjs",
-      "bytes": 27149,
-      "sha256": "c71ba6c5c67ef7cb224b9d40523f9575e228dc593cc2dbdcc193dc7de83deeec"
+      "bytes": 30339,
+      "sha256": "56fce61e1de71bb347293e6186a7ec6819e02037e8ea0be3923767e248cb6da3"
     },
     {
       "path": "tools/resolver-python.py",
-      "bytes": 35536,
-      "sha256": "59abc5f40d9f19715a6b8d1ea9eafecf421b62ad96b6a2be6ee012d85a0869c7"
+      "bytes": 39106,
+      "sha256": "34c29f528b0b777024d8c3bd5b2ea468e311d4c8ad8f288eb73ca80851e168e9"
     },
     {
       "path": "tools/validate-spec.mjs",
-      "bytes": 46942,
-      "sha256": "f7453a987ffde29e5024e91c0a8de5aef2feca29400ffe8f2e34eb22581794fd"
+      "bytes": 60889,
+      "sha256": "9722911b882468e6a3b8fa9289176c8cf70ede5c0913dd0fdf3b343e7da175cc"
     }
   ],
-  "root_hash": "9cf1fadf1cf399e4757233c2f4d526978a7b8e3d66b3dc17e7d19c7c105950dd"
+  "root_hash": "185ab54b7c488e4bf37bf83cc95e3bb65051c820cb0e0ea24fad76fa46bc26df"
 }

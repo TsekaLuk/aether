@@ -1,7 +1,7 @@
 {
   "schema": "aether.g0-report/0.4",
   "status": "FAIL",
-  "spec_lock_hash": "sha256:9cf1fadf1cf399e4757233c2f4d526978a7b8e3d66b3dc17e7d19c7c105950dd",
+  "spec_lock_hash": "sha256:185ab54b7c488e4bf37bf83cc95e3bb65051c820cb0e0ea24fad76fa46bc26df",
   "metrics": {
     "parent_prd_rules": 380,
     "indexed_k0_rules": 69,
@@ -11,19 +11,23 @@
     "evidence_gap_k0_and_memory_rules": 43,
     "conformance_vectors": 14,
     "independent_executor_agreements": 14,
-    "source_cases": 77,
-    "independent_parser_agreements": 77,
+    "source_cases": 78,
+    "independent_parser_agreements": 78,
+    "syntax_source_map_audits": 7,
     "raw_source_cases": 2,
     "raw_source_parser_agreements": 2,
-    "resolution_cases": 38,
-    "independent_resolver_agreements": 38,
-    "resolved_asr_schema_validations": 11,
-    "resolved_asr_identity_audits": 11,
+    "resolution_cases": 39,
+    "independent_resolver_agreements": 39,
+    "resolved_asr_schema_validations": 12,
+    "resolved_asr_identity_audits": 12,
     "resolved_asr_identity_mutations_rejected": 6,
+    "resolved_source_map_schema_validations": 12,
+    "resolved_source_map_audits": 12,
+    "resolved_source_map_mutations_rejected": 7,
     "resolution_equivalence_groups": 2,
     "reserved_layer_tokens_rejected": 11,
     "generated_layer_mutations_rejected": 55,
-    "schema_layer_smuggling_probes_rejected": 9,
+    "schema_layer_smuggling_probes_rejected": 10,
     "package_boundary_probes_rejected": 6,
     "explicit_open_markers": 6,
     "mechanized_theorem_fragments": 4,
@@ -34,13 +38,13 @@
       "id": "G0-01",
       "status": "PASS",
       "requirement": "content-addressed spec.lock",
-      "evidence": "sha256:9cf1fadf1cf399e4757233c2f4d526978a7b8e3d66b3dc17e7d19c7c105950dd"
+      "evidence": "sha256:185ab54b7c488e4bf37bf83cc95e3bb65051c820cb0e0ea24fad76fa46bc26df"
     },
     {
       "id": "G0-02",
       "status": "FAIL",
       "requirement": "complete K0 Core grammar and static/dynamic semantics",
-      "evidence": "77/77 source cases parse and 38/38 package cases resolve across independent implementations; field resolution, lowering, and full expression/control-flow semantics remain incomplete"
+      "evidence": "78/78 source cases parse, 39/39 package cases resolve, and 12/12 resolved source maps audit across independent implementations; field-identity elaboration, lowering, and full expression/control-flow semantics remain incomplete"
     },
     {
       "id": "G0-03",
@@ -76,7 +80,7 @@
       "id": "G0-08",
       "status": "FAIL",
       "requirement": "K1/K2 unreachable from K0 stable entry",
-      "evidence": "55/55 lexical mutations, 6/6 package probes, 9/9 structural smuggling probes, and 6/6 identity mutations reject; 11 resolved ASRs pass closure audits, but field/lowering reachability remains incomplete"
+      "evidence": "55/55 lexical mutations, 6/6 package probes, 10/10 structural smuggling probes, 6/6 identity mutations, and 7/7 source-map mutations reject; field-elaboration/lowering reachability remains incomplete"
     },
     {
       "id": "G0-09",

@@ -21,6 +21,14 @@
     {
       "id": "source.all-productions",
       "source": "module corpus.all;\npub const LIMIT: u64 = 4 * 2;\nstruct Pair {\n  pub first: u64,\n  second: u64,\n  invariant pair.ordered: first <= second;\n}\nenum Choice {\n  None,\n  One(u64),\n  Pair { left: u64, right: u64, },\n  invariant choice.valid: true;\n}\npub fn first(x: &'source Pair) -> &'source u64\nrequires first.visible: true;\nensures first.same: result == x.first;\n{\n  &x.first\n}\nfn exercise(mut_ref: &mut u64, choice: Choice, flag: bool) -> u64 {\n  let mut n: u64 = 1;\n  let p = init Pair { first: n, second: 2, };\n  let empty = init Empty {};\n  let values = [1, 2,];\n  let tuple = (1, true,);\n  let shared = &p.first;\n  let exclusive = &mut *mut_ref;\n  *exclusive = values[0];\n  n = *shared;\n  consume(move tuple);\n  while flag { continue; }\n  loop { break; }\n  if flag {\n    n + 1\n  } else if false {\n    n - 1\n  } else {\n    match choice {\n      Choice::None => n,\n      Choice::One(v) => v,\n      Choice::Pair { left: l, right: r, } => l + r,\n    }\n  }\n}\n"
+    },
+    {
+      "id": "source.utf8-comment-provenance",
+      "source": "/* \u91cf */ module bytes; fn main(){}",
+      "expect_source_map": [
+        { "path": [], "start": 10, "origin": "source" },
+        { "path": ["items", 0], "start": 24, "origin": "source" }
+      ]
     }
   ],
   "equivalent": [

@@ -23,13 +23,14 @@ compiler and does not claim end-to-end verification.
 The current executable subset covers move state, borrow conflicts, allocator
 brands, allocation failure, explicit deallocation, double-deallocation rejection,
 and affine leak diagnostics. Node and Python implementations agree on all 14
-frozen transition vectors and all 77 source-boundary cases, plus two invalid
-UTF-8 byte cases. The two resolvers also agree on all 38 package-resolution
-inputs. Eleven accepted outputs validate against the closed resolved-ASR schema
-and pass identity-closure audits; all six structurally valid identity-tampering
-mutations are rejected. The K0 rule index is complete at 69/69, with 26 rules
-carrying executable evidence and 43 retaining an explicit evidence gap. Seventy
-lexical, package, and structural ASR/Core probes reject later-layer smuggling.
+frozen transition vectors and all 78 source-boundary cases, plus two invalid
+UTF-8 byte cases. The two resolvers also agree on all 39 package-resolution
+inputs. Twelve accepted outputs validate against the closed resolved-ASR schema,
+pass identity-closure audits, and carry independently audited companion source
+maps; all six identity and seven provenance mutations are rejected. The K0 rule
+index is complete at 69/69, with 26 rules carrying executable evidence and 43
+retaining an explicit evidence gap. Seventy-one lexical, package, and structural
+ASR/source-map/Core probes reject later-layer smuggling.
 
 Lean 4 is pinned for mechanized metatheory. Four checked theorem fragments cover
 the allocation-cell submodel; none is classified as a full K0 theorem.
@@ -67,7 +68,8 @@ npm test
 ```
 
 Validation parses every JSON artifact, checks Rule ID and test links, runs both
-parsers, resolvers, and executors, audits resolved-ASR identities and closure,
+parsers, resolvers, and executors, audits resolved-ASR identities, source
+provenance, and closure,
 rejects layer-boundary mutations, validates closed ASR/Core schemas, verifies
 target parameters, rebuilds `spec.lock`, and regenerates the G0 report. A G0
 `FAIL` is currently expected; structural or semantic disagreement still makes

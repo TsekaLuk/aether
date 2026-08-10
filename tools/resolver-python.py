@@ -48,6 +48,58 @@ def path_text(path):
     return "::".join(path)
 
 
+def hydrate_locations(tree, source_map, source):
+    for entry in source_map["entries"]:
+        node = tree
+        for component in entry["path"]:
+            node = node[component]
+        node["_span"] = {
+            "source": source,
+            "start": entry["start"],
+            "end": entry["end"],
+            "origin": entry["origin"],
+        }
+
+
+def pointer_component(component):
+    return str(component).replace("~", "~0").replace("/", "~1")
+
+
+def detach_sources(value, path, entries):
+    if isinstance(value, list):
+        return [
+            detach_sources(child, [*path, index], entries)
+            for index, child in enumerate(value)
+        ]
+    if not isinstance(value, dict):
+        return value
+    source = value.get("_source")
+    if source is not None:
+        entries.append({
+            "pointer": "" if not path else "/" + "/".join(
+                pointer_component(component) for component in path
+            ),
+            **source,
+        })
+    return {
+        key: detach_sources(value[key], [*path, key], entries)
+        for key in sorted(value)
+        if key != "_source"
+    }
+
+
+def semantic_value(value):
+    if isinstance(value, list):
+        return [semantic_value(child) for child in value]
+    if not isinstance(value, dict):
+        return value
+    return {
+        key: semantic_value(value[key])
+        for key in sorted(value)
+        if key != "_source"
+    }
+
+
 class Resolver:
     def __init__(self, input_value):
         self.input = input_value
@@ -61,6 +113,12 @@ class Resolver:
 
     def error(self, code, module, subject):
         raise ResolveError(code, module, subject)
+
+    @staticmethod
+    def with_source(node, value):
+        if node is not None and node.get("_span") is not None:
+            value["_source"] = dict(node["_span"])
+        return value
 
     def symbol(self, module, namespace, name, kind):
         identifier = short_id(
@@ -131,6 +189,7 @@ class Resolver:
             parsed = PARSER.parse(self.sources[source])
             if parsed["status"] != "accepted":
                 raise ParseRejection(parsed)
+            hydrate_locations(parsed["tree"], parsed["source_map"], source)
             declared_module = ".".join(parsed["tree"]["module"])
             if declared_module != module:
                 self.error("RESOLVE-MODULE-MISMATCH", module, declared_module)
@@ -138,6 +197,7 @@ class Resolver:
                 "path": module,
                 "source": source,
                 "tree": parsed["tree"],
+                "source_map": parsed["source_map"],
                 "types": {},
                 "values": {},
             }
@@ -492,7 +552,7 @@ class Resolver:
     def expression(self, node, context):
         kind = node["kind"]
         if kind in ("integer", "boolean"):
-            return dict(node)
+            return {"kind": kind, "value": node["value"]}
         if kind == "path":
             return self.ref_node(self.lookup_value(node["path"], context["module"], context["scopes"]))
         if kind == "binary":
@@ -537,7 +597,10 @@ class Resolver:
             return {
                 "kind": "record", "constructor": constructor["identity"]["id"],
                 "fields": [
-                    {"name": field["name"], "value": self.expression(field["value"], context)}
+                    self.with_source(field, {
+                        "name": field["name"],
+                        "value": self.expression(field["value"], context),
+                    })
                     for field in node["fields"]
                 ],
             }
@@ -555,7 +618,9 @@ class Resolver:
                 pattern = self.pattern(arm["pattern"], context)
                 expression = self.expression(arm["expression"], context)
                 context["scopes"].pop()
-                arms.append({"pattern": pattern, "expression": expression})
+                arms.append(self.with_source(arm, {
+                    "pattern": pattern, "expression": expression,
+                }))
             return {
                 "kind": "match",
                 "value": self.expression(node["value"], context),
@@ -595,7 +660,10 @@ class Resolver:
             return {
                 "kind": kind, "constructor": constructor["identity"]["id"],
                 "fields": [
-                    {"name": field["name"], "pattern": self.pattern(field["pattern"], context)}
+                    self.with_source(field, {
+                        "name": field["name"],
+                        "pattern": self.pattern(field["pattern"], context),
+                    })
                     for field in node["fields"]
                 ],
             }
@@ -649,7 +717,7 @@ class Resolver:
     def contract_expression(self, node, context):
         kind = node["kind"]
         if kind in ("integer", "boolean"):
-            return dict(node)
+            return {"kind": kind, "value": node["value"]}
         if kind == "contract_unary":
             return {
                 "kind": kind, "operator": node["operator"],
@@ -685,7 +753,7 @@ class Resolver:
             "identity": contract["_identity"],
             "kind": contract["kind"],
             "status": "DECLARED_UNPROVEN",
-            "expression_hash": f"sha256:{digest('aether-k0-contract-expression', stable_json(expression))}",
+            "expression_hash": f"sha256:{digest('aether-k0-contract-expression', stable_json(semantic_value(expression)))}",
             "expression": expression,
         }
 
@@ -704,10 +772,10 @@ class Resolver:
             }
         if kind == "struct":
             fields = [
-                {
+                self.with_source(field, {
                     "name": field["name"], "visibility": field["visibility"],
                     "type": self.resolve_type(field["type"], plain_type_context),
-                }
+                })
                 for field in item["fields"]
             ]
             field_names = {field["name"] for field in item["fields"]}
@@ -737,14 +805,17 @@ class Resolver:
                     resolved_payload = {
                         "kind": "record",
                         "fields": [
-                            {
+                            self.with_source(field, {
                                 "name": field["name"], "visibility": field["visibility"],
                                 "type": self.resolve_type(field["type"], plain_type_context),
-                            }
+                            })
                             for field in payload["fields"]
                         ],
                     }
-                variants.append({"identity": variant["_identity"], "payload": resolved_payload})
+                variants.append(self.with_source(variant, {
+                    "identity": variant["_identity"],
+                    "payload": self.with_source(payload, resolved_payload),
+                }))
             return {
                 "kind": kind, "identity": item["_identity"],
                 "visibility": item["visibility"], "variants": variants,
@@ -769,7 +840,9 @@ class Resolver:
         for parameter in item["params"]:
             type_value = self.resolve_type(parameter["type"], type_context)
             binding = self.declare_local(context, parameter["name"], "parameter")
-            params.append({"binding": binding, "type": type_value})
+            params.append(self.with_source(parameter, {
+                "binding": binding, "type": type_value,
+            }))
         contract_locals = {parameter["binding"]["name"]: parameter["binding"] for parameter in params}
         contracts = [
             self.contract(
@@ -814,28 +887,60 @@ class Resolver:
         self.prepare_modules()
         self.collect()
         entry = self.resolve_entry()
+        raw_asr = {
+            "schema": "aether.asr/k0-0.4",
+            "language_version": "0.4.0-draft",
+            "core_layer": "K0",
+            "package_id": self.package_id,
+            "target": self.target.get("id"),
+            "entry": entry,
+            "modules": [
+                self.with_source(module_info["tree"], {
+                    "path": module_info["path"],
+                    "source": module_info["source"],
+                    "items": [
+                        self.resolve_item(item, module_info["path"])
+                        for item in module_info["tree"]["items"]
+                    ],
+                })
+                for module_info in self.modules.values()
+            ],
+        }
+        source_entries = []
+        asr = detach_sources(raw_asr, [], source_entries)
         return {
             "status": "accepted",
-            "asr": {
-                "schema": "aether.asr/k0-0.4",
+            "asr": asr,
+            "source_map": {
+                "schema": "aether.source-map/k0-0.4",
                 "language_version": "0.4.0-draft",
-                "core_layer": "K0",
+                "asr_schema": "aether.asr/k0-0.4",
+                "asr_hash": f"sha256:{digest('aether-k0-resolved-asr', stable_json(asr))}",
                 "package_id": self.package_id,
-                "target": self.target.get("id"),
-                "entry": entry,
-                "modules": [
+                "sources": sorted([
                     {
-                        "path": module_info["path"],
-                        "source": module_info["source"],
-                        "items": [
-                            self.resolve_item(item, module_info["path"])
-                            for item in module_info["tree"]["items"]
-                        ],
+                        "path": module_info["source"],
+                        "sha256": module_info["source_map"]["source_sha256"],
+                        "byte_length": module_info["source_map"]["byte_length"],
                     }
                     for module_info in self.modules.values()
-                ],
+                ], key=lambda source: source["path"]),
+                "entries": source_entries,
             },
         }
+
+
+def source_mapped_method(method):
+    def mapped(self, node, *args, **kwargs):
+        return self.with_source(node, method(self, node, *args, **kwargs))
+    return mapped
+
+
+for method_name in [
+    "resolve_type", "expression", "pattern", "block", "statement",
+    "contract_expression", "contract", "resolve_item",
+]:
+    setattr(Resolver, method_name, source_mapped_method(getattr(Resolver, method_name)))
 
 
 def resolve_package(input_value):

@@ -1,3 +1,4 @@
+import crypto from "node:crypto";
 import fs from "node:fs";
 
 const KEYWORDS = new Set([
@@ -84,6 +85,17 @@ function parseInteger(text, start, end) {
 
 export function tokenize(source) {
   const tokens = [];
+  const byteOffsets = new Array(source.length + 1);
+  let byteOffset = 0;
+  for (let offset = 0; offset < source.length;) {
+    const scalar = String.fromCodePoint(source.codePointAt(offset));
+    byteOffsets[offset] = byteOffset;
+    if (scalar.length === 2) byteOffsets[offset + 1] = byteOffset;
+    offset += scalar.length;
+    byteOffset += Buffer.byteLength(scalar, "utf8");
+  }
+  byteOffsets[source.length] = byteOffset;
+  const byte = (offset) => byteOffsets[offset];
   let index = 0;
   while (index < source.length) {
     const char = source[index];
@@ -99,7 +111,7 @@ export function tokenize(source) {
     if (source.startsWith("/*", index)) {
       const start = index;
       const end = source.indexOf("*/", index + 2);
-      if (end < 0) lexicalError("LEX-UNTERMINATED-COMMENT", start, source.length);
+      if (end < 0) lexicalError("LEX-UNTERMINATED-COMMENT", byte(start), byte(source.length));
       index = end + 2;
       continue;
     }
@@ -107,11 +119,11 @@ export function tokenize(source) {
       const start = index;
       index += 1;
       if (index >= source.length || !/[A-Za-z_]/.test(source[index])) {
-        lexicalError("LEX-INVALID-TOKEN", start, index, "'");
+        lexicalError("LEX-INVALID-TOKEN", byte(start), byte(index), "'");
       }
       index += 1;
       while (index < source.length && /[A-Za-z0-9_]/.test(source[index])) index += 1;
-      tokens.push({ kind: "LIFETIME", text: source.slice(start, index), start, end: index });
+      tokens.push({ kind: "LIFETIME", text: source.slice(start, index), start: byte(start), end: byte(index) });
       continue;
     }
     if (/[A-Za-z_]/.test(char)) {
@@ -120,12 +132,12 @@ export function tokenize(source) {
       while (index < source.length && /[A-Za-z0-9_]/.test(source[index])) index += 1;
       const text = source.slice(start, index);
       if (RESERVED.has(text)) {
-        const error = new K0Error("lexical", "LAYER-FEATURE-DISABLED", start, index, text);
+        const error = new K0Error("lexical", "LAYER-FEATURE-DISABLED", byte(start), byte(index), text);
         error.diagnostic.requested_layer = "K0";
         error.diagnostic.available_since = RESERVED.get(text);
         throw error;
       }
-      tokens.push({ kind: KEYWORDS.has(text) ? "KEYWORD" : "IDENT", text, start, end: index });
+      tokens.push({ kind: KEYWORDS.has(text) ? "KEYWORD" : "IDENT", text, start: byte(start), end: byte(index) });
       continue;
     }
     if (/[0-9]/.test(char)) {
@@ -133,19 +145,30 @@ export function tokenize(source) {
       index += 1;
       while (index < source.length && /[A-Za-z0-9_]/.test(source[index])) index += 1;
       const text = source.slice(start, index);
-      tokens.push({ kind: "INTEGER", text, value: parseInteger(text, start, index), start, end: index });
+      tokens.push({
+        kind: "INTEGER",
+        text,
+        value: parseInteger(text, byte(start), byte(index)),
+        start: byte(start),
+        end: byte(index),
+      });
       continue;
     }
     const punctuator = PUNCTUATORS.find((candidate) => source.startsWith(candidate, index));
     if (punctuator) {
-      tokens.push({ kind: "PUNCT", text: punctuator, start: index, end: index + punctuator.length });
+      tokens.push({
+        kind: "PUNCT",
+        text: punctuator,
+        start: byte(index),
+        end: byte(index + punctuator.length),
+      });
       index += punctuator.length;
       continue;
     }
     const scalar = String.fromCodePoint(source.codePointAt(index));
-    lexicalError("LEX-INVALID-TOKEN", index, index + Buffer.byteLength(scalar, "utf8"), scalar);
+    lexicalError("LEX-INVALID-TOKEN", byte(index), byte(index + scalar.length), scalar);
   }
-  tokens.push({ kind: "EOF", text: "<eof>", start: source.length, end: source.length });
+  tokens.push({ kind: "EOF", text: "<eof>", start: byte(source.length), end: byte(source.length) });
   return tokens;
 }
 
@@ -157,6 +180,11 @@ class Parser {
 
   current() {
     return this.tokens[this.index];
+  }
+
+  mark(start, value, end = this.tokens[Math.max(0, this.index - 1)].end, origin = "source") {
+    value._span = { start, end, origin };
+    return value;
   }
 
   at(text) {
@@ -270,19 +298,24 @@ class Parser {
         invariants.push(this.invariant());
         continue;
       }
+      const variantStart = this.current().start;
       const variantName = this.identifier();
-      let payload = { kind: "unit" };
+      let payload = this.mark(variantStart, { kind: "unit" });
       if (this.take("(")) {
+        const payloadStart = this.tokens[this.index - 1].start;
         payload = { kind: "tuple", types: this.typeList(")") };
         this.expect(")");
+        this.mark(payloadStart, payload);
       } else if (this.take("{")) {
+        const payloadStart = this.tokens[this.index - 1].start;
         const fields = [];
         while (!this.at("}")) fields.push(this.fieldDecl());
         this.expect("}");
         payload = { kind: "record", fields };
+        this.mark(payloadStart, payload);
       }
       this.expect(",");
-      variants.push({ kind: "variant", name: variantName, payload });
+      variants.push(this.mark(variantStart, { kind: "variant", name: variantName, payload }));
     }
     this.expect("}");
     return { kind: "enum", visibility, name, variants, invariants };
@@ -294,24 +327,34 @@ class Parser {
     const params = [];
     if (!this.at(")")) {
       while (true) {
+        const parameterStart = this.current().start;
         const paramName = this.identifier();
         this.expect(":");
-        params.push({ name: paramName, type: this.type() });
+        params.push(this.mark(parameterStart, { name: paramName, type: this.type() }));
         if (!this.take(",")) break;
         if (this.at(")")) break;
       }
     }
     this.expect(")");
-    const result = this.take("->") ? this.type() : { kind: "primitive", name: "unit" };
+    const implicitResultOffset = this.tokens[this.index - 1].end;
+    const result = this.take("->")
+      ? this.type()
+      : this.mark(implicitResultOffset, { kind: "primitive", name: "unit" }, implicitResultOffset, "synthetic");
     const contracts = [];
     while (this.at("requires") || this.at("ensures")) {
+      const contractStart = this.current().start;
       const contractKind = this.current().text;
       this.index += 1;
       const id = this.contractId();
       this.expect(":");
       const expression = this.contractExpression();
       this.expect(";");
-      contracts.push({ kind: contractKind, id, expression, status: "DECLARED_UNPROVEN" });
+      contracts.push(this.mark(contractStart, {
+        kind: contractKind,
+        id,
+        expression,
+        status: "DECLARED_UNPROVEN",
+      }));
     }
     const body = this.block();
     return { kind: "function", visibility, name, params, result, contracts, body };
@@ -407,6 +450,7 @@ class Parser {
     let tail = null;
     while (!this.at("}")) {
       if (this.current().kind === "EOF") this.error();
+      const statementStart = this.current().start;
       if (this.take("let")) {
         const mutable = this.take("mut");
         const name = this.identifier();
@@ -414,33 +458,33 @@ class Parser {
         this.expect("=");
         const value = this.expression();
         this.expect(";");
-        statements.push({ kind: "let", mutable, name, annotation, value });
+        statements.push(this.mark(statementStart, { kind: "let", mutable, name, annotation, value }));
         continue;
       }
       if (this.take("return")) {
         const value = this.at(";") ? null : this.expression();
         this.expect(";");
-        statements.push({ kind: "return", value });
+        statements.push(this.mark(statementStart, { kind: "return", value }));
         continue;
       }
       if (this.take("while")) {
         const condition = this.expression();
         const body = this.block();
-        statements.push({ kind: "while", condition, body });
+        statements.push(this.mark(statementStart, { kind: "while", condition, body }));
         continue;
       }
       if (this.take("loop")) {
-        statements.push({ kind: "loop", body: this.block() });
+        statements.push(this.mark(statementStart, { kind: "loop", body: this.block() }));
         continue;
       }
       if (this.take("break")) {
         this.expect(";");
-        statements.push({ kind: "break" });
+        statements.push(this.mark(statementStart, { kind: "break" }));
         continue;
       }
       if (this.take("continue")) {
         this.expect(";");
-        statements.push({ kind: "continue" });
+        statements.push(this.mark(statementStart, { kind: "continue" }));
         continue;
       }
       const left = this.expression();
@@ -448,9 +492,9 @@ class Parser {
         if (!this.isPlace(left)) this.error(this.tokens[this.index - 1]);
         const value = this.expression();
         this.expect(";");
-        statements.push({ kind: "assign", place: left, value });
+        statements.push(this.mark(statementStart, { kind: "assign", place: left, value }));
       } else if (this.take(";")) {
-        statements.push({ kind: "expression_statement", expression: left });
+        statements.push(this.mark(statementStart, { kind: "expression_statement", expression: left }));
       } else if (this.at("}")) {
         tail = left;
         break;
@@ -469,6 +513,7 @@ class Parser {
   }
 
   expression(minimum = 1) {
+    const start = this.current().start;
     let left = this.unaryExpression();
     while (true) {
       const precedence = BINARY_PRECEDENCE.get(this.current().text) ?? 0;
@@ -476,36 +521,37 @@ class Parser {
       const operator = this.current().text;
       this.index += 1;
       const right = this.expression(precedence + 1);
-      left = { kind: "binary", operator, left, right };
+      left = this.mark(start, { kind: "binary", operator, left, right });
     }
-    return left;
+    return this.mark(start, left);
   }
 
   unaryExpression() {
+    const start = this.current().start;
     if (this.at("!") || this.at("-") || this.at("move") || this.at("*")) {
       const operator = this.current().text;
       this.index += 1;
-      return { kind: "unary", operator, value: this.unaryExpression() };
+      return this.mark(start, { kind: "unary", operator, value: this.unaryExpression() });
     }
     if (this.take("&")) {
       const mutable = this.take("mut");
-      return { kind: "borrow", mutable, place: this.unaryExpression() };
+      return this.mark(start, { kind: "borrow", mutable, place: this.unaryExpression() });
     }
     let value = this.primary();
     while (true) {
       if (this.take("(")) {
         const arguments_ = this.expressionList(")");
         this.expect(")");
-        value = { kind: "call", callee: value, arguments: arguments_ };
+        value = this.mark(start, { kind: "call", callee: value, arguments: arguments_ });
       } else if (this.take(".")) {
-        value = { kind: "field", base: value, field: this.identifier() };
+        value = this.mark(start, { kind: "field", base: value, field: this.identifier() });
       } else if (this.take("[")) {
         const index = this.expression();
         this.expect("]");
-        value = { kind: "index", base: value, index };
+        value = this.mark(start, { kind: "index", base: value, index });
       } else break;
     }
-    return value;
+    return this.mark(start, value);
   }
 
   expressionList(end) {
@@ -526,11 +572,12 @@ class Parser {
       this.expect("{");
       const fields = [];
       while (!this.at("}")) {
+        const fieldStart = this.current().start;
         const name = this.identifier();
         this.expect(":");
         const value = this.expression();
         this.expect(",");
-        fields.push({ name, value });
+        fields.push(this.mark(fieldStart, { name, value }));
       }
       this.expect("}");
       return { kind: "record", path, fields };
@@ -567,7 +614,11 @@ class Parser {
     const then = this.block();
     let otherwise = null;
     if (this.take("else")) {
-      if (this.take("if")) otherwise = this.ifExpression();
+      if (this.at("if")) {
+        const otherwiseStart = this.current().start;
+        this.expect("if");
+        otherwise = this.mark(otherwiseStart, this.ifExpression());
+      }
       else otherwise = this.block();
     }
     return { kind: "if", condition, then, otherwise };
@@ -579,11 +630,12 @@ class Parser {
     const arms = [];
     if (this.at("}")) this.error();
     while (!this.at("}")) {
+      const armStart = this.current().start;
       const pattern = this.pattern();
       this.expect("=>");
       const expression = this.expression();
       this.expect(",");
-      arms.push({ pattern, expression });
+      arms.push(this.mark(armStart, { pattern, expression }));
     }
     this.expect("}");
     return { kind: "match", value, arms };
@@ -621,11 +673,12 @@ class Parser {
     if (this.take("{")) {
       const fields = [];
       while (!this.at("}")) {
+        const fieldStart = this.current().start;
         const name = this.identifier();
         this.expect(":");
         const pattern = this.pattern();
         this.expect(",");
-        fields.push({ name, pattern });
+        fields.push(this.mark(fieldStart, { name, pattern }));
       }
       this.expect("}");
       return { kind: "variant_record_pattern", path, fields };
@@ -634,6 +687,7 @@ class Parser {
   }
 
   contractExpression(minimum = 1) {
+    const start = this.current().start;
     let left = this.contractUnary();
     while (true) {
       const precedence = CONTRACT_PRECEDENCE.get(this.current().text) ?? 0;
@@ -641,34 +695,85 @@ class Parser {
       const operator = this.current().text;
       this.index += 1;
       const right = this.contractExpression(precedence + 1);
-      left = { kind: "contract_binary", operator, left, right };
+      left = this.mark(start, { kind: "contract_binary", operator, left, right });
     }
-    return left;
+    return this.mark(start, left);
   }
 
   contractUnary() {
+    const start = this.current().start;
     if (this.at("!") || this.at("-")) {
       const operator = this.current().text;
       this.index += 1;
-      return { kind: "contract_unary", operator, value: this.contractUnary() };
+      return this.mark(start, { kind: "contract_unary", operator, value: this.contractUnary() });
     }
     if (this.current().kind === "INTEGER" || this.at("true") || this.at("false")) return this.literal();
     if (this.take("(")) {
       const value = this.contractExpression();
       this.expect(")");
-      return value;
+      return this.mark(start, value);
     }
     const symbol = this.symbolPath();
     const fields = [];
     while (this.take(".")) fields.push(this.identifier());
-    return { kind: "contract_path", symbol, fields };
+    return this.mark(start, { kind: "contract_path", symbol, fields });
   }
+}
+
+for (const methodName of [
+  "parseSource", "item", "constDecl", "invariant", "fieldDecl",
+  "structDecl", "enumDecl", "fnDecl", "type", "integerLiteral",
+  "literal", "block", "primary", "ifExpression", "matchExpression",
+  "pattern",
+]) {
+  const method = Parser.prototype[methodName];
+  Parser.prototype[methodName] = function tracedParserNode(...args) {
+    const start = this.current().start;
+    return this.mark(start, method.apply(this, args));
+  };
+}
+
+function detachLocations(value, path, entries) {
+  if (Array.isArray(value)) {
+    return value.map((child, index) => detachLocations(child, [...path, index], entries));
+  }
+  if (!value || typeof value !== "object") return value;
+  if (value._span) {
+    entries.push({
+      path,
+      start: value._span.start,
+      end: value._span.end,
+      origin: value._span.origin,
+    });
+  }
+  const output = {};
+  const keys = Object.keys(value)
+    .filter((key) => key !== "_span")
+    .sort((left, right) => left < right ? -1 : left > right ? 1 : 0);
+  for (const key of keys) output[key] = detachLocations(value[key], [...path, key], entries);
+  return output;
+}
+
+function acceptedParse(tree, source) {
+  const entries = [];
+  const detachedTree = detachLocations(tree, [], entries);
+  const bytes = Buffer.from(source, "utf8");
+  return {
+    status: "accepted",
+    tree: detachedTree,
+    source_map: {
+      schema: "aether.syntax-source-map/k0-0.4",
+      source_sha256: `sha256:${crypto.createHash("sha256").update(bytes).digest("hex")}`,
+      byte_length: bytes.length,
+      entries,
+    },
+  };
 }
 
 export function parse(source) {
   try {
     const parser = new Parser(tokenize(source));
-    return { status: "accepted", tree: parser.parseSource() };
+    return acceptedParse(parser.parseSource(), source);
   } catch (error) {
     if (error instanceof K0Error) return error.diagnostic;
     throw error;

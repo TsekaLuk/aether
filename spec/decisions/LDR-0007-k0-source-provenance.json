@@ -1,0 +1,29 @@
+{
+  "schema": "aether.ldr/0.4",
+  "id": "LDR-0007",
+  "title": "K0 source provenance is orthogonal to semantic ASR",
+  "status": "DRAFT",
+  "basis": "LCP-0003, P6, P8, PIPE-002, PIPE-006, PIPE-009, and PIPE-010",
+  "decision": "Publish an exact companion source map from resolved-ASR JSON Pointers to original UTF-8 byte ranges, while excluding all provenance from semantic identities and hashes.",
+  "dissent": [
+    "A companion artifact requires consumers to retain and bind two files.",
+    "JSON Pointer paths can shift after semantic tree edits even when a declaration identity survives.",
+    "Line and column displays remain derived and can differ across user interfaces."
+  ],
+  "compatibility": {
+    "classification": "breaking-draft-tool-output-addition",
+    "source": "Non-ASCII UTF-8 remains forbidden as a token but is explicitly allowed inside comments.",
+    "semantic": "Resolved ASR and contract hashes exclude provenance and remain trivia-independent.",
+    "proof": "Future translation proofs can bind diagnostics and Core nodes to an independently audited source object.",
+    "abi": "No runtime or ABI change.",
+    "artifact": "A new source-map artifact and its independent hash are required for audited resolver output.",
+    "tooling": "Consumers must keep source maps separate from semantic ASR hashing."
+  },
+  "supersedes": [],
+  "rules": [
+    "PIPE-002",
+    "PIPE-006",
+    "PIPE-009",
+    "PIPE-010"
+  ]
+}
