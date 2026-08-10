@@ -1,0 +1,33 @@
+{
+  "schema": "aether.ldr/0.4",
+  "id": "LDR-0004",
+  "title": "K0 closes aggregate, dereference, lifetime, and invariant syntax",
+  "status": "DRAFT",
+  "basis": "LCP-0001 and Aether-PRD-v0.3 sections 31, 32.3, 32.4, and 32.7",
+  "decision": "Use explicit init construction, explicit dereference, labelled public reference relations, and a total contract-expression subgrammar. These close requirements already imposed by K0 without adding allocation, inference, or runtime contract behavior.",
+  "dissent": [
+    "The init keyword is more verbose than conventional record literals.",
+    "A separate contract grammar duplicates a subset of the value-expression grammar."
+  ],
+  "compatibility": {
+    "classification": "breaking-draft-correction",
+    "source": "Draft aggregate and returned-reference syntax changes.",
+    "semantic": "No new observable behavior; previously unrepresentable constitutional requirements become representable.",
+    "proof": "Adds aggregate and dereference cases and explicit lifetime relation IDs.",
+    "abi": "No stable K0 ABI exists.",
+    "artifact": "ASR, Core, and spec lock hashes change.",
+    "tooling": "Parsers and canonical syntax consumers must recognize the new nodes."
+  },
+  "supersedes": [],
+  "rules": [
+    "K0-EXEC-002",
+    "K0-PLACE-001",
+    "K0-PLACE-004",
+    "K0-PLACE-006",
+    "K0-BORROW-002",
+    "K0-BORROW-005",
+    "K0-CONTRACT-001",
+    "K0-CONTRACT-005",
+    "K0-HOST-001"
+  ]
+}

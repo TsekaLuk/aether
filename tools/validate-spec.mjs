@@ -4,11 +4,14 @@ import path from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { execute as executeNode } from "./executor-node.mjs";
+import { parse as parseNode, parseBytes as parseNodeBytes } from "./parser-node.mjs";
+import { unclosedObjectSchemas, validateSchema } from "./json-schema.mjs";
 
 const packageRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const specRoot = path.join(packageRoot, "spec");
 const prdPath = path.join(packageRoot, "docs/prd/Aether-PRD-v0.3.md");
 const pythonExecutor = path.join(packageRoot, "tools/executor-python.py");
+const pythonParser = path.join(packageRoot, "tools/parser-python.py");
 const pythonCommand = process.env.AETHER_PYTHON || "python3";
 const problems = [];
 
@@ -98,7 +101,10 @@ const indexedRuleIds = requireUnique(rules.map((rule) => rule.id), "indexed Rule
 for (const rule of rules) {
   if (!prdRuleIds.has(rule.id)) fail(`indexed rule absent from parent PRD: ${rule.id}`);
   if (!fs.existsSync(path.resolve(specRoot, rule.source))) fail(`${rule.id}: missing source ${rule.source}`);
-  if (!Array.isArray(rule.tests) || rule.tests.length === 0) fail(`${rule.id}: no linked tests`);
+  if (!Array.isArray(rule.tests)) fail(`${rule.id}: tests must be an array`);
+  if (rule.tests?.length === 0 && !(typeof rule.evidence_gap === "string" && rule.evidence_gap.length > 0)) {
+    fail(`${rule.id}: no linked tests or explicit evidence gap`);
+  }
   if (!new Set(["DRAFT", "EXPERIMENTAL", "PROVISIONAL", "STABLE"]).has(rule.status)) {
     fail(`${rule.id}: invalid status ${rule.status}`);
   }
@@ -142,6 +148,180 @@ for (const rule of rules) {
     if (!vector) fail(`${rule.id}: linked test does not exist: ${testId}`);
     else if (!vector.rules.includes(rule.id)) fail(`${rule.id}: test ${testId} does not link back to rule`);
   }
+}
+
+const sourceCorpus = readJson(path.join(specRoot, "conformance/source/cases.json"));
+const reservedLayerMap = new Map(Object.entries(sourceCorpus?.reserved_layers ?? {}));
+const reservedTokens = new Set(reservedLayerMap.keys());
+const generatedLayerCases = [...reservedTokens].flatMap((token) =>
+  (sourceCorpus?.layer_positions ?? []).map((template, position) => ({
+    id: `layer.generated.${token}.${position}`,
+    source: template.replace("$TOKEN", token),
+    code: "LAYER-FEATURE-DISABLED",
+    token,
+  })));
+const sourceCases = [
+  ...(sourceCorpus?.accept ?? []),
+  ...(sourceCorpus?.reject ?? []),
+  ...generatedLayerCases,
+  ...(sourceCorpus?.equivalent ?? []).flatMap((group) =>
+    group.sources.map((source, index) => ({ id: `${group.id}.${index}`, source }))),
+];
+requireUnique(sourceCases.map((entry) => entry.id), "source conformance ID");
+
+function parseWithPython(testCase) {
+  const python = spawnSync(pythonCommand, [pythonParser], {
+    input: testCase.source,
+    encoding: "utf8",
+    maxBuffer: 4 * 1024 * 1024,
+  });
+  if (python.status !== 0) {
+    fail(`${testCase.id}: Python parser failed: ${python.stderr.trim()}`);
+    return null;
+  }
+  try {
+    return JSON.parse(python.stdout);
+  } catch (error) {
+    fail(`${testCase.id}: Python parser returned invalid JSON: ${error.message}`);
+    return null;
+  }
+}
+
+let sourceParserAgreement = 0;
+for (const testCase of sourceCases) {
+  const nodeResult = parseNode(testCase.source);
+  const pythonResult = parseWithPython(testCase);
+  if (!pythonResult) continue;
+  if (stableJson(nodeResult) !== stableJson(pythonResult)) {
+    fail(`${testCase.id}: independent parser disagreement`);
+    continue;
+  }
+  sourceParserAgreement += 1;
+}
+
+for (const testCase of sourceCorpus?.accept ?? []) {
+  const result = parseNode(testCase.source);
+  if (result.status !== "accepted") fail(`${testCase.id}: expected source acceptance, got ${result.code}`);
+}
+
+for (const testCase of sourceCorpus?.reject ?? []) {
+  const result = parseNode(testCase.source);
+  if (result.status !== "rejected") {
+    fail(`${testCase.id}: expected source rejection`);
+    continue;
+  }
+  if (result.code !== testCase.code) fail(`${testCase.id}: expected ${testCase.code}, got ${result.code}`);
+  if (testCase.token && result.token !== testCase.token) {
+    fail(`${testCase.id}: expected token ${testCase.token}, got ${result.token ?? "none"}`);
+  }
+  if (testCase.span && stableJson(result.span) !== stableJson(testCase.span)) {
+    fail(`${testCase.id}: expected byte span ${stableJson(testCase.span)}, got ${stableJson(result.span)}`);
+  }
+}
+
+let rawSourceParserAgreement = 0;
+for (const testCase of sourceCorpus?.raw_reject ?? []) {
+  const bytes = Buffer.from(testCase.hex, "hex");
+  if (bytes.toString("hex") !== testCase.hex) {
+    fail(`${testCase.id}: invalid canonical hex fixture`);
+    continue;
+  }
+  const nodeResult = parseNodeBytes(bytes);
+  const python = spawnSync(pythonCommand, [pythonParser], {
+    input: bytes,
+    encoding: "buffer",
+    maxBuffer: 1024 * 1024,
+  });
+  let pythonResult;
+  try {
+    pythonResult = JSON.parse(python.stdout.toString("utf8"));
+  } catch (error) {
+    fail(`${testCase.id}: Python raw parser failed: ${python.stderr.toString("utf8").trim() || error.message}`);
+    continue;
+  }
+  if (stableJson(nodeResult) !== stableJson(pythonResult)) fail(`${testCase.id}: raw parser disagreement`);
+  else rawSourceParserAgreement += 1;
+  if (nodeResult.code !== testCase.code) fail(`${testCase.id}: expected ${testCase.code}, got ${nodeResult.code}`);
+}
+
+for (const testCase of generatedLayerCases) {
+  const result = parseNode(testCase.source);
+  if (result.status !== "rejected" || result.code !== testCase.code || result.token !== testCase.token ||
+      result.requested_layer !== "K0" || result.available_since !== reservedLayerMap.get(testCase.token)) {
+    fail(`${testCase.id}: generated layer mutation escaped lexical rejection`);
+  }
+}
+
+for (const group of sourceCorpus?.equivalent ?? []) {
+  const results = group.sources.map((source) => parseNode(source));
+  if (results.some((result) => result.status !== "accepted")) {
+    fail(`${group.id}: equivalent source was rejected`);
+    continue;
+  }
+  const canonicalTrees = new Set(results.map((result) => stableJson(result.tree)));
+  if (canonicalTrees.size !== 1) fail(`${group.id}: equivalent sources produced different canonical trees`);
+}
+
+const rejectedReservedTokens = new Set((sourceCorpus?.reject ?? [])
+  .filter((entry) => entry.code === "LAYER-FEATURE-DISABLED")
+  .map((entry) => entry.token));
+for (const token of reservedTokens) {
+  if (!rejectedReservedTokens.has(token)) fail(`missing reserved-token rejection case: ${token}`);
+}
+
+const coreSchema = readJson(path.join(specRoot, "core/syntax/K0.schema.json"));
+const asrSchema = readJson(path.join(specRoot, "asr/K0.schema.json"));
+for (const [name, schema] of [["Core", coreSchema], ["ASR", asrSchema]]) {
+  for (const schemaPath of unclosedObjectSchemas(schema)) {
+    fail(`${name} schema has an open object boundary at ${schemaPath}`);
+  }
+}
+for (const vector of vectors) {
+  const schemaErrors = validateSchema(coreSchema, vector);
+  if (schemaErrors.length > 0) fail(`${vector.id}: Core schema rejected vector: ${schemaErrors[0]}`);
+}
+
+const layerCorpus = readJson(path.join(specRoot, "conformance/layer/K0.json"));
+let schemaLayerRejections = 0;
+for (const [index, value] of (layerCorpus?.asr?.accept ?? []).entries()) {
+  const schemaErrors = validateSchema(asrSchema, value);
+  if (schemaErrors.length > 0) fail(`layer.asr.accept.${index}: ASR schema rejected K0 value: ${schemaErrors[0]}`);
+}
+for (const testCase of layerCorpus?.asr?.reject ?? []) {
+  if (validateSchema(asrSchema, testCase.value).length === 0) fail(`${testCase.id}: ASR schema accepted later-layer data`);
+  else schemaLayerRejections += 1;
+}
+for (const testCase of layerCorpus?.core?.reject ?? []) {
+  if (validateSchema(coreSchema, testCase.value).length === 0) fail(`${testCase.id}: Core schema accepted later-layer data`);
+  else schemaLayerRejections += 1;
+}
+const allowedHost = new Set(layerCorpus?.host?.allowed ?? []);
+const forbiddenHost = new Set(layerCorpus?.host?.forbidden ?? []);
+const targetHost = new Set(referenceTarget?.host_primitives ?? []);
+const targetForbiddenHost = new Set(referenceTarget?.forbidden_host_inputs ?? []);
+if (stableJson([...allowedHost].sort()) !== stableJson([...targetHost].sort())) fail("K0 host allowlist differs from target manifest");
+if (stableJson([...forbiddenHost].sort()) !== stableJson([...targetForbiddenHost].sort())) fail("K0 forbidden host list differs from target manifest");
+
+const packageSchema = readJson(path.join(specRoot, "manifests/package.schema.json"));
+const packageCorpus = readJson(path.join(specRoot, "conformance/package/K0.json"));
+function packageErrors(manifest) {
+  const errors = validateSchema(packageSchema, manifest);
+  if (errors.length > 0) return errors;
+  const sourcePaths = Object.values(manifest.modules);
+  if (new Set(sourcePaths).size !== sourcePaths.length) errors.push("duplicate normalized module source path");
+  const entryParts = manifest.entry.split("::");
+  const entryModule = entryParts.slice(0, -1).join(".");
+  if (!(entryModule in manifest.modules)) errors.push("entry module is absent from module map");
+  return errors;
+}
+for (const [index, manifest] of (packageCorpus?.accept ?? []).entries()) {
+  const errors = packageErrors(manifest);
+  if (errors.length > 0) fail(`package.accept.${index}: valid K0 package rejected: ${errors[0]}`);
+}
+let packageBoundaryRejections = 0;
+for (const testCase of packageCorpus?.reject ?? []) {
+  if (packageErrors(testCase.value).length === 0) fail(`${testCase.id}: package boundary accepted forbidden input`);
+  else packageBoundaryRejections += 1;
 }
 
 for (const decisionFile of allFiles(path.join(specRoot, "decisions")).filter((file) => file.endsWith(".json"))) {
@@ -201,6 +381,84 @@ const pythonAtLeastMinimum = versionAtLeast(actualPythonParts, minimumPythonPart
 if (!pythonEntry || pythonEntry.version_family !== pythonFamily || !pythonAtLeastMinimum) {
   fail(`toolchain Python version mismatch: family=${pythonEntry?.version_family ?? "missing"}, minimum=${pythonEntry?.minimum_version ?? "missing"}, actual=${actualPython}`);
 }
+const proofTool = toolchain?.mechanized_proof_tool;
+const leanToolchainPath = path.join(packageRoot, "lean-toolchain");
+const leanToolchain = fs.existsSync(leanToolchainPath) ? fs.readFileSync(leanToolchainPath, "utf8").trim() : "";
+if (!proofTool || proofTool.name !== "Lean 4" || proofTool.version !== "4.24.0" ||
+    proofTool.toolchain !== leanToolchain || proofTool.sorry_allowed !== false) {
+  fail("mechanized proof tool lock differs from lean-toolchain or required trust policy");
+}
+const rustBuildTool = proofTool?.rust_build_tool;
+if (!rustBuildTool || rustBuildTool.rustc_version !== "1.85.0" ||
+    rustBuildTool.rustc_source_commit !== "4d91de4e48198da2e33413efdcd9cd2cc0c46688" ||
+    rustBuildTool.cargo_version !== "1.85.0" ||
+    rustBuildTool.cargo_source_commit !== "d73d2caf9e41a39daf2a8d6ce60ec80bf354d2a7" ||
+    rustBuildTool.build_flag !== "--locked") {
+  fail("Nanoda Rust build tool differs from the trust policy");
+}
+const requiredCheckerCommits = new Map([
+  ["lean4checker", "da26eb05e9959402afcb9bd6dfe5dc4f700f70d6"],
+  ["lean4export-format2024", "eb023e55e0852a9bf9b569ecefc42d54338b0c8f"],
+  ["nanoda", "e5438ac0a85a036b6dfe093aa457bc3448498014"],
+]);
+const checkerEntries = proofTool?.independent_checkers ?? [];
+if (checkerEntries.length !== requiredCheckerCommits.size) {
+  fail("mechanized proof checker lock has missing or additional entries");
+}
+const checkerScripts = ["tools/check-lean4checker.sh", "tools/check-nanoda.sh"]
+  .map((file) => fs.readFileSync(path.join(packageRoot, file), "utf8"))
+  .join("\n");
+for (const [name, sourceCommit] of requiredCheckerCommits) {
+  const checker = checkerEntries.find((entry) => entry.name === name);
+  if (!checker || checker.source_commit !== sourceCommit) {
+    fail(`${name}: independent checker commit differs from the trust policy`);
+  }
+  if (!checkerScripts.includes(sourceCommit)) {
+    fail(`${name}: locked commit is not used by an independent replay script`);
+  }
+}
+if (!checkerScripts.includes('rust_toolchain="1.85.0"') || !checkerScripts.includes("--locked")) {
+  fail("Nanoda replay script does not use the locked Rust build policy");
+}
+const leanProofFiles = allFiles(path.join(specRoot, "proof/mechanized")).filter((file) => file.endsWith(".lean"));
+if (leanProofFiles.length === 0) fail("mechanized proof directory contains no Lean files");
+for (const file of leanProofFiles) {
+  const proofText = fs.readFileSync(file, "utf8");
+  const prohibited = proofText.match(/\b(sorry|admit|axiom)\b/);
+  if (prohibited) fail(`${path.relative(packageRoot, file)}: prohibited proof placeholder ${prohibited[1]}`);
+}
+const theoremLedger = readJson(path.join(specRoot, "proof/logic/K0-theorems.json"));
+const requiredTheoremIds = new Set([
+  "META-K0-DET", "META-K0-PRES", "META-K0-PROGRESS", "META-K0-INIT",
+  "META-K0-MOVE", "META-K0-BORROW", "META-K0-DEALLOC",
+  "META-K0-EXPLICIT-ALLOC", "META-K0-EXPLICIT-FAIL",
+]);
+const theoremEntries = theoremLedger?.theorems ?? [];
+const theoremIds = requireUnique(theoremEntries.map((entry) => entry.id), "K0 theorem ID");
+for (const id of requiredTheoremIds) {
+  if (!theoremIds.has(id)) fail(`missing required K0 theorem: ${id}`);
+}
+for (const entry of theoremEntries) {
+  if (!requiredTheoremIds.has(entry.id)) fail(`unknown K0 theorem ID: ${entry.id}`);
+  if (!new Set(["STATEMENT_ONLY", "TESTED_SUBSET", "PROVED_FRAGMENT", "PROVED"]).has(entry.status)) {
+    fail(`${entry.id}: invalid theorem status ${entry.status}`);
+  }
+  if (entry.status === "PROVED_FRAGMENT" || entry.status === "PROVED") {
+    if (!(typeof entry.artifact === "string" && fs.existsSync(path.join(specRoot, entry.artifact)))) {
+      fail(`${entry.id}: checked theorem artifact is absent`);
+    }
+    if (!(typeof entry.declaration === "string" && entry.declaration.startsWith("Aether.K0."))) {
+      fail(`${entry.id}: checked theorem declaration is absent`);
+    }
+    const declarationName = entry.declaration.split(".").at(-1);
+    const artifactText = fs.readFileSync(path.join(specRoot, entry.artifact), "utf8");
+    if (!(new RegExp(`\\btheorem\\s+${declarationName}\\b`).test(artifactText))) {
+      fail(`${entry.id}: declaration ${entry.declaration} is not present in its artifact`);
+    }
+  }
+}
+const provedFragments = theoremEntries.filter((entry) => entry.status === "PROVED_FRAGMENT").length;
+const provedTheorems = theoremEntries.filter((entry) => entry.status === "PROVED").length;
 
 if (problems.length > 0) {
   process.stderr.write("Aether v0.4 structural validation FAILED\n");
@@ -210,6 +468,9 @@ if (problems.length > 0) {
 
 const lockFiles = [
   "package.json",
+  "lakefile.lean",
+  "lake-manifest.json",
+  "lean-toolchain",
   "docs/prd/Aether-PRD-v0.3.md",
   ...allFiles(specRoot)
     .map((file) => path.relative(packageRoot, file))
@@ -239,7 +500,10 @@ fs.writeFileSync(lockPath, `${JSON.stringify(lock, null, 2)}\n`);
 
 const k0Required = [...prdRuleIds].filter((id) => id.startsWith("K0-") || id.startsWith("MEM-")).sort();
 const missingK0Rules = k0Required.filter((id) => !indexedRuleIds.has(id));
-const stableRules = rules.filter((rule) => rule.status === "STABLE");
+const requiredRules = rules.filter((rule) => k0Required.includes(rule.id));
+const stableRules = requiredRules.filter((rule) => rule.status === "STABLE");
+const evidenceBearingRules = requiredRules.filter((rule) => rule.tests.length > 0);
+const evidenceGapRules = requiredRules.filter((rule) => rule.tests.length === 0);
 const openMarkers = allFiles(specRoot)
   .filter((file) => file.endsWith(".md") || file.endsWith(".json"))
   .reduce((count, file) => count + (fs.readFileSync(file, "utf8").match(/\bOPEN\b/g)?.length ?? 0), 0);
@@ -250,13 +514,13 @@ const tcRequirementsPresent = [
 
 const checks = [
   { id: "G0-01", status: "PASS", requirement: "content-addressed spec.lock", evidence: `sha256:${lock.root_hash}` },
-  { id: "G0-02", status: "FAIL", requirement: "complete K0 Core grammar and static/dynamic semantics", evidence: "transition subset exists; full expression/control-flow model remains OPEN" },
+  { id: "G0-02", status: "FAIL", requirement: "complete K0 Core grammar and static/dynamic semantics", evidence: `${sourceParserAgreement}/${sourceCases.length} source cases agree across two parsers; name resolution, lowering, and full expression/control-flow semantics remain incomplete` },
   { id: "G0-03", status: "FAIL", requirement: "complete object/resource state machines", evidence: "move, borrow, allocation, deallocation, and leak subset executes; fields, arrays, calls, joins, and numeric states remain OPEN" },
-  { id: "G0-04", status: stableRules.length > 0 && missingK0Rules.length === 0 ? "PASS" : "FAIL", requirement: "every frozen K0 Rule ID linked to conformance evidence", evidence: `${rules.length}/${k0Required.length} K0/MEM rules indexed; ${stableRules.length} marked STABLE` },
+  { id: "G0-04", status: missingK0Rules.length === 0 && evidenceGapRules.length === 0 && stableRules.length === k0Required.length ? "PASS" : "FAIL", requirement: "every frozen K0 Rule ID linked to conformance evidence", evidence: `${requiredRules.length}/${k0Required.length} K0/MEM rules indexed; ${evidenceBearingRules.length} evidence-bearing; ${evidenceGapRules.length} explicit gaps; ${stableRules.length} marked STABLE` },
   { id: "G0-05", status: executorAgreement === vectors.length ? "PASS" : "FAIL", requirement: "two independent Core executors agree", evidence: `${executorAgreement}/${vectors.length} vectors agree byte-for-structure` },
-  { id: "G0-06", status: "FAIL", requirement: "mechanized metatheory repository", evidence: "theorem ledger exists; no theorem is PROVED and no proof tool is locked" },
-  { id: "G0-07", status: "PASS", requirement: "host toolchain and initial TCB recorded", evidence: "Node and Python versions validated; no external package or network dependency" },
-  { id: "G0-08", status: "FAIL", requirement: "K1/K2 unreachable from K0 stable entry", evidence: "later tokens are reserved, but no complete source parser or ASR reachability proof exists" },
+  { id: "G0-06", status: provedTheorems >= 9 ? "PASS" : "FAIL", requirement: "mechanized metatheory repository", evidence: `Lean 4 v4.24.0 and pinned independent replay are locked; ${provedFragments} theorem fragments are encoded but ${provedTheorems}/9 required full K0 theorems are PROVED` },
+  { id: "G0-07", status: "PASS", requirement: "host toolchain and initial TCB recorded", evidence: "Node/Python hosts and Lean proof tool are pinned; no npm, Python, or Lean package dependency" },
+  { id: "G0-08", status: "FAIL", requirement: "K1/K2 unreachable from K0 stable entry", evidence: `${generatedLayerCases.length}/${generatedLayerCases.length} lexical mutations, ${packageBoundaryRejections}/${packageCorpus?.reject?.length ?? 0} package probes, and ${schemaLayerRejections}/${(layerCorpus?.asr?.reject?.length ?? 0) + (layerCorpus?.core?.reject?.length ?? 0)} ASR/Core smuggling probes reject; resolved-ASR reachability proof remains incomplete` },
   { id: "G0-09", status: tcRequirementsPresent ? "PASS" : "FAIL", requirement: "K1 computation-universality requirements frozen without expanding K0", evidence: tcRequirementsPresent ? "EXEC-001..008 and TC-001..008 exist in parent PRD" : "required TC rules missing" },
   { id: "G0-10", status: "PASS", requirement: "offline-readable review and OPEN inventory", evidence: `${openMarkers} explicit OPEN markers; report and lock are local files` },
 ];
@@ -267,17 +531,29 @@ const report = {
   spec_lock_hash: `sha256:${lock.root_hash}`,
   metrics: {
     parent_prd_rules: prdRuleIds.size,
-    indexed_k0_rules: rules.length,
+    indexed_k0_rules: requiredRules.length,
     required_k0_and_memory_rules: k0Required.length,
     missing_k0_and_memory_rules: missingK0Rules.length,
+    evidence_bearing_k0_and_memory_rules: evidenceBearingRules.length,
+    evidence_gap_k0_and_memory_rules: evidenceGapRules.length,
     conformance_vectors: vectors.length,
     independent_executor_agreements: executorAgreement,
+    source_cases: sourceCases.length,
+    independent_parser_agreements: sourceParserAgreement,
+    raw_source_cases: sourceCorpus?.raw_reject?.length ?? 0,
+    raw_source_parser_agreements: rawSourceParserAgreement,
+    reserved_layer_tokens_rejected: rejectedReservedTokens.size,
+    generated_layer_mutations_rejected: generatedLayerCases.length,
+    schema_layer_smuggling_probes_rejected: schemaLayerRejections,
+    package_boundary_probes_rejected: packageBoundaryRejections,
     explicit_open_markers: openMarkers,
-    mechanized_theorems_proved: 0,
+    mechanized_theorem_fragments: provedFragments,
+    mechanized_theorems_proved: provedTheorems,
   },
   checks,
   blockers: checks.filter((check) => check.status !== "PASS").map((check) => check.id),
   missing_rule_ids: missingK0Rules,
+  evidence_gap_rule_ids: evidenceGapRules.map((rule) => rule.id),
   authorization: g0Status === "PASS"
     ? "Formal K0 implementation may begin; no later layer is authorized."
     : "Only specification engineering and disposable semantic probes are authorized.",
@@ -293,10 +569,19 @@ const markdown = `# Aether K0 G0 Report\n\n` +
   checks.map((check) => `| ${check.id} | **${check.status}** | ${check.requirement} | ${check.evidence} |`).join("\n") +
   `\n\n## Metrics\n\n` +
   `- Parent PRD Rule IDs: ${prdRuleIds.size}\n` +
-  `- Indexed K0/MEM rules: ${rules.length}/${k0Required.length}\n` +
+  `- Indexed K0/MEM rules: ${requiredRules.length}/${k0Required.length}\n` +
+  `- Evidence-bearing K0/MEM rules: ${evidenceBearingRules.length}/${k0Required.length}\n` +
+  `- Explicit K0/MEM evidence gaps: ${evidenceGapRules.length}\n` +
   `- Conformance vectors: ${vectors.length}\n` +
   `- Independent executor agreements: ${executorAgreement}/${vectors.length}\n` +
-  `- Mechanized theorems proved: 0\n` +
+  `- Independent parser agreements: ${sourceParserAgreement}/${sourceCases.length}\n` +
+  `- Raw-byte parser agreements: ${rawSourceParserAgreement}/${sourceCorpus?.raw_reject?.length ?? 0}\n` +
+  `- Reserved layer tokens rejected: ${rejectedReservedTokens.size}/${reservedTokens.size}\n` +
+  `- Generated layer mutations rejected: ${generatedLayerCases.length}/${generatedLayerCases.length}\n` +
+  `- ASR/Core smuggling probes rejected: ${schemaLayerRejections}/${(layerCorpus?.asr?.reject?.length ?? 0) + (layerCorpus?.core?.reject?.length ?? 0)}\n` +
+  `- Package boundary probes rejected: ${packageBoundaryRejections}/${packageCorpus?.reject?.length ?? 0}\n` +
+  `- Mechanized theorem fragments: ${provedFragments}\n` +
+  `- Mechanized theorems proved: ${provedTheorems}/9\n` +
   `- Explicit OPEN markers: ${openMarkers}\n\n` +
   `## Decision\n\n` +
   `G0 does not pass. The package is executable and internally cross-checked, but it is not a complete language semantics or mechanized soundness argument. The next work must close G0-02, G0-03, G0-04, G0-06, and G0-08 without adding K1/K2 features.\n`;
@@ -310,8 +595,13 @@ if (!parsedLock || parsedLock.root_hash !== lock.root_hash) {
 
 process.stdout.write(`Aether v0.4 structural validation PASS\n`);
 process.stdout.write(`- Rule IDs in parent PRD: ${prdRuleIds.size}\n`);
-process.stdout.write(`- Indexed executable rules: ${rules.length}\n`);
+process.stdout.write(`- Indexed rules: ${rules.length}\n`);
+process.stdout.write(`- K0/MEM traceability: ${requiredRules.length}/${k0Required.length} indexed, ${evidenceBearingRules.length} evidence-bearing\n`);
 process.stdout.write(`- Conformance vectors: ${vectors.length}\n`);
 process.stdout.write(`- Independent executor agreements: ${executorAgreement}/${vectors.length}\n`);
+process.stdout.write(`- Independent parser agreements: ${sourceParserAgreement}/${sourceCases.length}\n`);
+process.stdout.write(`- Raw-byte parser agreements: ${rawSourceParserAgreement}/${sourceCorpus?.raw_reject?.length ?? 0}\n`);
+process.stdout.write(`- Layer boundary probes: ${generatedLayerCases.length + schemaLayerRejections + packageBoundaryRejections}/${generatedLayerCases.length + schemaLayerRejections + packageBoundaryRejections}\n`);
+process.stdout.write(`- Mechanized proof fragments: ${provedFragments}\n`);
 process.stdout.write(`- spec.lock root: sha256:${lock.root_hash}\n`);
 process.stdout.write(`- G0 status: ${g0Status}\n`);

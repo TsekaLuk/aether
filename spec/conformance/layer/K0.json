@@ -1,0 +1,146 @@
+{
+  "schema": "aether.layer-conformance/k0-0.4",
+  "asr": {
+    "accept": [
+      {
+        "schema": "aether.asr/k0-0.4",
+        "language_version": "0.4.0-draft",
+        "core_layer": "K0",
+        "module": "boundary",
+        "items": [
+          {
+            "kind": "function",
+            "symbol": "sym:0123456789abcdef",
+            "name": "main",
+            "visibility": "private",
+            "type": "unit",
+            "contracts": []
+          }
+        ]
+      }
+    ],
+    "reject": [
+      {
+        "id": "asr.effect-field",
+        "value": {
+          "schema": "aether.asr/k0-0.4",
+          "language_version": "0.4.0-draft",
+          "core_layer": "K0",
+          "module": "boundary",
+          "items": [
+            {
+              "kind": "function",
+              "symbol": "sym:0123456789abcdef",
+              "name": "main",
+              "visibility": "private",
+              "type": "unit",
+              "contracts": [],
+              "effects": ["io"]
+            }
+          ]
+        }
+      },
+      {
+        "id": "asr.task-kind",
+        "value": {
+          "schema": "aether.asr/k0-0.4",
+          "language_version": "0.4.0-draft",
+          "core_layer": "K0",
+          "module": "boundary",
+          "items": [
+            {
+              "kind": "task",
+              "symbol": "sym:0123456789abcdef",
+              "name": "main",
+              "visibility": "private"
+            }
+          ]
+        }
+      },
+      {
+        "id": "asr.layer-upgrade",
+        "value": {
+          "schema": "aether.asr/k0-0.4",
+          "language_version": "0.4.0-draft",
+          "core_layer": "K1",
+          "module": "boundary",
+          "items": []
+        }
+      },
+      {
+        "id": "asr.root-capabilities",
+        "value": {
+          "schema": "aether.asr/k0-0.4",
+          "language_version": "0.4.0-draft",
+          "core_layer": "K0",
+          "module": "boundary",
+          "items": [],
+          "capabilities": []
+        }
+      }
+    ]
+  },
+  "core": {
+    "reject": [
+      {
+        "id": "core.spawn-op",
+        "value": {
+          "schema": "aether.core-transition/k0-0.4",
+          "id": "layer.spawn-op",
+          "rules": ["K0-HOST-001"],
+          "target": "k0-reference-64",
+          "initial": { "places": {}, "allocators": {} },
+          "steps": [{ "op": "spawn", "function": "worker" }],
+          "expect": { "status": "ok" }
+        }
+      },
+      {
+        "id": "core.effect-field",
+        "value": {
+          "schema": "aether.core-transition/k0-0.4",
+          "id": "layer.effect-field",
+          "rules": ["K0-HOST-001"],
+          "target": "k0-reference-64",
+          "initial": {
+            "places": { "x": { "state": "initialized", "value": { "kind": "unit" } } },
+            "allocators": {}
+          },
+          "steps": [{ "op": "use", "place": "x", "effect": "io" }],
+          "expect": { "status": "ok" }
+        }
+      },
+      {
+        "id": "core.capability-value",
+        "value": {
+          "schema": "aether.core-transition/k0-0.4",
+          "id": "layer.capability-value",
+          "rules": ["K0-HOST-001"],
+          "target": "k0-reference-64",
+          "initial": {
+            "places": { "x": { "state": "initialized", "value": { "kind": "capability", "name": "net" } } },
+            "allocators": {}
+          },
+          "steps": [],
+          "expect": { "status": "ok" }
+        }
+      },
+      {
+        "id": "core.assumption-root",
+        "value": {
+          "schema": "aether.core-transition/k0-0.4",
+          "id": "layer.assumption-root",
+          "rules": ["K0-HOST-001"],
+          "target": "k0-reference-64",
+          "initial": { "places": {}, "allocators": {} },
+          "steps": [],
+          "expect": { "status": "ok" },
+          "assumptions": ["trusted"]
+        }
+      }
+    ]
+  },
+  "host": {
+    "allowed": ["alloc", "dealloc", "return", "target_fault"],
+    "forbidden": ["filesystem", "network", "clock", "entropy", "environment", "process"]
+  }
+}

@@ -1,15 +1,26 @@
 {
   "schema": "aether.g0-report/0.4",
   "status": "FAIL",
-  "spec_lock_hash": "sha256:4218a8f939ce461170e7d8b79001d289920053d86ff5b70cd75f9d44d23db855",
+  "spec_lock_hash": "sha256:88f11e7094c6dab5dee131b9c8e7f038d093f093276e631cfddfdc8c041eddf0",
   "metrics": {
     "parent_prd_rules": 380,
-    "indexed_k0_rules": 21,
+    "indexed_k0_rules": 69,
     "required_k0_and_memory_rules": 69,
-    "missing_k0_and_memory_rules": 50,
+    "missing_k0_and_memory_rules": 0,
+    "evidence_bearing_k0_and_memory_rules": 19,
+    "evidence_gap_k0_and_memory_rules": 50,
     "conformance_vectors": 14,
     "independent_executor_agreements": 14,
-    "explicit_open_markers": 7,
+    "source_cases": 77,
+    "independent_parser_agreements": 77,
+    "raw_source_cases": 2,
+    "raw_source_parser_agreements": 2,
+    "reserved_layer_tokens_rejected": 11,
+    "generated_layer_mutations_rejected": 55,
+    "schema_layer_smuggling_probes_rejected": 8,
+    "package_boundary_probes_rejected": 6,
+    "explicit_open_markers": 6,
+    "mechanized_theorem_fragments": 4,
     "mechanized_theorems_proved": 0
   },
   "checks": [
@@ -17,13 +28,13 @@
       "id": "G0-01",
       "status": "PASS",
       "requirement": "content-addressed spec.lock",
-      "evidence": "sha256:4218a8f939ce461170e7d8b79001d289920053d86ff5b70cd75f9d44d23db855"
+      "evidence": "sha256:88f11e7094c6dab5dee131b9c8e7f038d093f093276e631cfddfdc8c041eddf0"
     },
     {
       "id": "G0-02",
       "status": "FAIL",
       "requirement": "complete K0 Core grammar and static/dynamic semantics",
-      "evidence": "transition subset exists; full expression/control-flow model remains OPEN"
+      "evidence": "77/77 source cases agree across two parsers; name resolution, lowering, and full expression/control-flow semantics remain incomplete"
     },
     {
       "id": "G0-03",
@@ -35,7 +46,7 @@
       "id": "G0-04",
       "status": "FAIL",
       "requirement": "every frozen K0 Rule ID linked to conformance evidence",
-      "evidence": "21/69 K0/MEM rules indexed; 0 marked STABLE"
+      "evidence": "69/69 K0/MEM rules indexed; 19 evidence-bearing; 50 explicit gaps; 0 marked STABLE"
     },
     {
       "id": "G0-05",
@@ -47,19 +58,19 @@
       "id": "G0-06",
       "status": "FAIL",
       "requirement": "mechanized metatheory repository",
-      "evidence": "theorem ledger exists; no theorem is PROVED and no proof tool is locked"
+      "evidence": "Lean 4 v4.24.0 and pinned independent replay are locked; 4 theorem fragments are encoded but 0/9 required full K0 theorems are PROVED"
     },
     {
       "id": "G0-07",
       "status": "PASS",
       "requirement": "host toolchain and initial TCB recorded",
-      "evidence": "Node and Python versions validated; no external package or network dependency"
+      "evidence": "Node/Python hosts and Lean proof tool are pinned; no npm, Python, or Lean package dependency"
     },
     {
       "id": "G0-08",
       "status": "FAIL",
       "requirement": "K1/K2 unreachable from K0 stable entry",
-      "evidence": "later tokens are reserved, but no complete source parser or ASR reachability proof exists"
+      "evidence": "55/55 lexical mutations, 6/6 package probes, and 8/8 ASR/Core smuggling probes reject; resolved-ASR reachability proof remains incomplete"
     },
     {
       "id": "G0-09",
@@ -71,7 +82,7 @@
       "id": "G0-10",
       "status": "PASS",
       "requirement": "offline-readable review and OPEN inventory",
-      "evidence": "7 explicit OPEN markers; report and lock are local files"
+      "evidence": "6 explicit OPEN markers; report and lock are local files"
     }
   ],
   "blockers": [
@@ -81,7 +92,24 @@
     "G0-06",
     "G0-08"
   ],
-  "missing_rule_ids": [
+  "missing_rule_ids": [],
+  "evidence_gap_rule_ids": [
+    "K0-EXEC-001",
+    "K0-EXEC-002",
+    "K0-EXEC-003",
+    "K0-EXEC-004",
+    "K0-EXEC-005",
+    "K0-EXEC-006",
+    "K0-TYPE-001",
+    "K0-TYPE-002",
+    "K0-TYPE-003",
+    "K0-TYPE-004",
+    "K0-TYPE-005",
+    "K0-TYPE-006",
+    "K0-PLACE-001",
+    "K0-PLACE-004",
+    "K0-PLACE-005",
+    "K0-PLACE-006",
     "K0-BORROW-005",
     "K0-BORROW-006",
     "K0-CF-001",
@@ -95,30 +123,10 @@
     "K0-CONTRACT-003",
     "K0-CONTRACT-004",
     "K0-CONTRACT-005",
-    "K0-EXEC-001",
-    "K0-EXEC-002",
-    "K0-EXEC-003",
-    "K0-EXEC-004",
-    "K0-EXEC-005",
-    "K0-EXEC-006",
     "K0-HOST-001",
     "K0-HOST-002",
     "K0-HOST-003",
     "K0-HOST-004",
-    "K0-PLACE-001",
-    "K0-PLACE-004",
-    "K0-PLACE-005",
-    "K0-PLACE-006",
-    "K0-TYPE-001",
-    "K0-TYPE-002",
-    "K0-TYPE-003",
-    "K0-TYPE-004",
-    "K0-TYPE-005",
-    "K0-TYPE-006",
-    "MEM-LIFE-001",
-    "MEM-LIFE-003",
-    "MEM-LIFE-004",
-    "MEM-LIFE-005",
     "MEM-OBJ-002",
     "MEM-OBJ-003",
     "MEM-REF-001",
@@ -131,7 +139,11 @@
     "MEM-REP-003",
     "MEM-REP-004",
     "MEM-REP-005",
-    "MEM-REP-006"
+    "MEM-REP-006",
+    "MEM-LIFE-001",
+    "MEM-LIFE-003",
+    "MEM-LIFE-004",
+    "MEM-LIFE-005"
   ],
   "authorization": "Only specification engineering and disposable semantic probes are authorized."
 }

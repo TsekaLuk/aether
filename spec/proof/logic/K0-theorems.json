@@ -1,0 +1,49 @@
+{
+  "schema": "aether.theorem-ledger/k0-0.4",
+  "theorems": [
+    {
+      "id": "META-K0-DET",
+      "status": "PROVED_FRAGMENT",
+      "artifact": "proof/mechanized/AetherProofs.lean",
+      "declaration": "Aether.K0.Fragment.step_deterministic"
+    },
+    {
+      "id": "META-K0-PRES",
+      "status": "STATEMENT_ONLY"
+    },
+    {
+      "id": "META-K0-PROGRESS",
+      "status": "PROVED_FRAGMENT",
+      "artifact": "proof/mechanized/AetherProofs.lean",
+      "declaration": "Aether.K0.Fragment.progress_fragment"
+    },
+    {
+      "id": "META-K0-INIT",
+      "status": "STATEMENT_ONLY"
+    },
+    {
+      "id": "META-K0-MOVE",
+      "status": "TESTED_SUBSET"
+    },
+    {
+      "id": "META-K0-BORROW",
+      "status": "TESTED_SUBSET"
+    },
+    {
+      "id": "META-K0-DEALLOC",
+      "status": "PROVED_FRAGMENT",
+      "artifact": "proof/mechanized/AetherProofs.lean",
+      "declaration": "Aether.K0.Fragment.dealloc_marks_dead"
+    },
+    {
+      "id": "META-K0-EXPLICIT-ALLOC",
+      "status": "PROVED_FRAGMENT",
+      "artifact": "proof/mechanized/AetherProofs.lean",
+      "declaration": "Aether.K0.Fragment.every_step_has_explicit_resource_event"
+    },
+    {
+      "id": "META-K0-EXPLICIT-FAIL",
+      "status": "STATEMENT_ONLY"
+    }
+  ]
+}

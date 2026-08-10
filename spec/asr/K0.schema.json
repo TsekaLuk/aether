@@ -3,11 +3,12 @@
   "$id": "https://aether.invalid/spec/0.4/asr/K0.schema.json",
   "title": "Aether K0 Resolved ASR",
   "type": "object",
-  "required": ["schema", "language_version", "module", "items"],
+  "required": ["schema", "language_version", "core_layer", "module", "items"],
   "additionalProperties": false,
   "properties": {
     "schema": { "const": "aether.asr/k0-0.4" },
     "language_version": { "const": "0.4.0-draft" },
+    "core_layer": { "const": "K0" },
     "module": { "type": "string", "pattern": "^[A-Za-z_][A-Za-z0-9_]*(\\.[A-Za-z_][A-Za-z0-9_]*)*$" },
     "items": {
       "type": "array",
@@ -95,7 +96,7 @@
           }
         }
       },
-      "additionalProperties": true
+      "additionalProperties": false
     }
   }
 }

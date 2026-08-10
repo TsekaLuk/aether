@@ -8,7 +8,9 @@ Work is ordered by semantic dependency, not implementation convenience.
   control results.
 - Define deterministic surface-to-Core lowering.
 - Complete static judgments and small-step transitions.
-- Add an independent source parser and ASR canonicalization check.
+- Done: independent Node/Python source parsers agree on the current grammar.
+- Next: complete package name resolution, canonical ASR, and deterministic
+  surface-to-Core lowering.
 
 ## 2. G0-03: complete object/resource states
 
@@ -19,22 +21,26 @@ Work is ordered by semantic dependency, not implementation convenience.
 
 ## 3. G0-04: complete Rule ID coverage
 
-- Index all 69 K0/MEM rules.
+- Done: all 69 K0/MEM rules are indexed; 50 explicit evidence gaps remain.
 - Bind each applicable rule to accept, reject, observe, and boundary evidence.
 - Add metamorphic and generated-property corpora.
 - Promote nothing to `STABLE` until semantic OPEN items are zero.
 
 ## 4. G0-06: mechanize metatheory
 
-- Select and lock a proof assistant through a trusted-base ADR.
+- Done: replay-compatible Lean 4.24.0 is locked through LDR-0005 with pinned
+  lean4checker/nanoda replay.
+- Done: a resource-transition fragment proves local determinism and explicit
+  alloc/dealloc state changes without placeholders.
 - Encode the Core syntax and transition relation.
-- Prove determinism, preservation, progress, move safety, borrow safety,
-  deallocation safety, explicit allocation, and explicit failure.
+- Prove determinism, preservation, progress, initialization safety, move safety,
+  borrow safety, deallocation safety, explicit allocation, and explicit failure.
 - Add an independent offline proof-check path.
 
 ## 5. G0-08: prove layer isolation
 
-- Reject every K1/K2 token and ASR/Core node at the K0 boundary.
+- Done for the current structural boundary: reserved tokens and ASR/Core schema
+  smuggling probes reject.
 - Prove later-layer nodes are unreachable from a K0 source/package manifest.
 - Add mutation tests that attempt to smuggle effects, capabilities, concurrency,
   user `unsafe`, and FFI into K0 artifacts.

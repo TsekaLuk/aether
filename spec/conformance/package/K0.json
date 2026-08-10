@@ -1,0 +1,89 @@
+{
+  "schema": "aether.package-conformance/k0-0.4",
+  "accept": [
+    {
+      "schema": "aether.package/k0-0.4",
+      "language_version": "0.4.0-draft",
+      "package_id": "aether.g0-corpus",
+      "target": "k0-reference-64",
+      "modules": {
+        "main": "src/main.ae",
+        "support.math": "src/support/math.ae"
+      },
+      "entry": "main::main"
+    }
+  ],
+  "reject": [
+    {
+      "id": "package.dependencies",
+      "value": {
+        "schema": "aether.package/k0-0.4",
+        "language_version": "0.4.0-draft",
+        "package_id": "boundary",
+        "target": "k0-reference-64",
+        "modules": { "main": "src/main.ae" },
+        "entry": "main::main",
+        "dependencies": { "later": "1" }
+      }
+    },
+    {
+      "id": "package.build-script",
+      "value": {
+        "schema": "aether.package/k0-0.4",
+        "language_version": "0.4.0-draft",
+        "package_id": "boundary",
+        "target": "k0-reference-64",
+        "modules": { "main": "src/main.ae" },
+        "entry": "main::main",
+        "build": "generate.js"
+      }
+    },
+    {
+      "id": "package.target-upgrade",
+      "value": {
+        "schema": "aether.package/k0-0.4",
+        "language_version": "0.4.0-draft",
+        "package_id": "boundary",
+        "target": "k1-hosted",
+        "modules": { "main": "src/main.ae" },
+        "entry": "main::main"
+      }
+    },
+    {
+      "id": "package.path-traversal",
+      "value": {
+        "schema": "aether.package/k0-0.4",
+        "language_version": "0.4.0-draft",
+        "package_id": "boundary",
+        "target": "k0-reference-64",
+        "modules": { "main": "../main.ae" },
+        "entry": "main::main"
+      }
+    },
+    {
+      "id": "package.duplicate-source",
+      "value": {
+        "schema": "aether.package/k0-0.4",
+        "language_version": "0.4.0-draft",
+        "package_id": "boundary",
+        "target": "k0-reference-64",
+        "modules": {
+          "main": "src/main.ae",
+          "alias": "src/main.ae"
+        },
+        "entry": "main::main"
+      }
+    },
+    {
+      "id": "package.entry-module-absent",
+      "value": {
+        "schema": "aether.package/k0-0.4",
+        "language_version": "0.4.0-draft",
+        "package_id": "boundary",
+        "target": "k0-reference-64",
+        "modules": { "support": "src/support.ae" },
+        "entry": "main::main"
+      }
+    }
+  ]
+}

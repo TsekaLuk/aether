@@ -13,7 +13,41 @@
       "trusted_stage": "A"
     }
   ],
-  "network_required": false,
+  "network_policy": {
+    "spec_validation": "OFFLINE_AFTER_HOST_TOOLCHAINS",
+    "proof_replay": "FETCH_PINNED_SOURCES_AND_LOCKED_CRATES_IF_CACHE_MISS"
+  },
   "external_packages": [],
-  "mechanized_proof_tool": null
+  "mechanized_proof_tool": {
+    "name": "Lean 4",
+    "version": "4.24.0",
+    "toolchain": "leanprover/lean4:v4.24.0",
+    "source_commit": "797c613eb9b6d4ec95db23e3e00af9ac6657f24b",
+    "release_date": "2025-10-14",
+    "external_packages": [],
+    "rust_build_tool": {
+      "rustc_version": "1.85.0",
+      "rustc_source_commit": "4d91de4e48198da2e33413efdcd9cd2cc0c46688",
+      "cargo_version": "1.85.0",
+      "cargo_source_commit": "d73d2caf9e41a39daf2a8d6ce60ec80bf354d2a7",
+      "dependency_lock": "nanoda upstream Cargo.lock",
+      "build_flag": "--locked"
+    },
+    "independent_checkers": [
+      {
+        "name": "lean4checker",
+        "source_commit": "da26eb05e9959402afcb9bd6dfe5dc4f700f70d6"
+      },
+      {
+        "name": "lean4export-format2024",
+        "source_commit": "eb023e55e0852a9bf9b569ecefc42d54338b0c8f"
+      },
+      {
+        "name": "nanoda",
+        "source_commit": "e5438ac0a85a036b6dfe093aa457bc3448498014"
+      }
+    ],
+    "sorry_allowed": false,
+    "trusted_stage": "C"
+  }
 }
