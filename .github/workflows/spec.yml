@@ -30,7 +30,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v7.0.0
         with:
-          python-version: 3.9.6
+          python-version: 3.9.25
 
       - name: Validate executable specification
         run: npm test

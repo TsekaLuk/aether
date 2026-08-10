@@ -45,7 +45,7 @@ language specification.
 Prerequisites are locked in `spec/manifests/toolchain.json`:
 
 - Node.js `26.4.0`
-- Python `3.9.6`
+- Python `3.9.x` at or above `3.9.6` (`3.9.25` in CI)
 - no external npm or Python packages
 - no network access during validation
 

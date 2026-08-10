@@ -4,7 +4,14 @@
   "host": "portable POSIX host",
   "tools": [
     { "role": "primary transition executor and validator", "command": "node", "version": "26.4.0", "trusted_stage": "A" },
-    { "role": "independent transition executor", "command": "python3", "version": "3.9.6", "trusted_stage": "A" }
+    {
+      "role": "independent transition executor",
+      "command": "python3",
+      "version_family": "3.9",
+      "minimum_version": "3.9.6",
+      "validated_versions": ["3.9.6", "3.9.25"],
+      "trusted_stage": "A"
+    }
   ],
   "network_required": false,
   "external_packages": [],

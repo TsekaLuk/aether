@@ -132,8 +132,8 @@
     },
     {
       "path": "spec/manifests/toolchain.json",
-      "bytes": 437,
-      "sha256": "36eb53af1f262e3145932ceb40886d9cf8f992c8835c2f7909fb6e5d3cdb0d81"
+      "bytes": 553,
+      "sha256": "e3712198ac1c61b97448cd38b93d893401a20b52c04f2ab9961a5755993de324"
     },
     {
       "path": "spec/modules/K0.md",
@@ -187,9 +187,9 @@
     },
     {
       "path": "tools/validate-spec.mjs",
-      "bytes": 15143,
-      "sha256": "a608e069293fc3523cc7ee8fbd5fc197f19935e9835292005f852de2951e2872"
+      "bytes": 15937,
+      "sha256": "2b21fb404f91238c271b90b60049412ac6417210aa70f4b5ac464991e515891a"
     }
   ],
-  "root_hash": "8d35ddf614aa045bf7f20f4aa969b8cb2233d5e2fc1a9050c89b899b6d03679d"
+  "root_hash": "4218a8f939ce461170e7d8b79001d289920053d86ff5b70cd75f9d44d23db855"
 }

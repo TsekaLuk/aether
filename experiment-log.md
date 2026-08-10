@@ -9,6 +9,8 @@
   all 14 results agreed with each other and the hand-authored semantic oracle.
 - Verified `spec.lock` is reproducible across repeated local runs.
 - Kept G0 at `FAIL`; tests were not promoted to formal proofs.
+- Validated the independent Python executor on the local 3.9.6 host and declared
+  3.9.25 as the Ubuntu CI profile within the locked Python 3.9 compatibility family.
 - Identified five blocking workstreams: complete Core semantics, complete resource
   states, rule coverage, mechanized metatheory, and K0 layer-isolation proof.
 

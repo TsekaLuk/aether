@@ -51,6 +51,15 @@ function sha256(data) {
   return crypto.createHash("sha256").update(data).digest("hex");
 }
 
+function versionAtLeast(actual, minimum) {
+  if (actual.length !== minimum.length || actual.some(Number.isNaN) || minimum.some(Number.isNaN)) return false;
+  for (let index = 0; index < actual.length; index += 1) {
+    if (actual[index] > minimum[index]) return true;
+    if (actual[index] < minimum[index]) return false;
+  }
+  return true;
+}
+
 function requireUnique(items, label) {
   const seen = new Set();
   for (const item of items) {
@@ -185,8 +194,12 @@ if (!nodeEntry || nodeEntry.version !== process.versions.node) {
 const pythonVersion = spawnSync(pythonCommand, ["--version"], { encoding: "utf8" });
 const actualPython = `${pythonVersion.stdout}${pythonVersion.stderr}`.trim().replace(/^Python\s+/, "");
 const pythonEntry = toolchain?.tools?.find((tool) => tool.command === "python3");
-if (!pythonEntry || pythonEntry.version !== actualPython) {
-  fail(`toolchain Python version mismatch: lock=${pythonEntry?.version ?? "missing"}, actual=${actualPython}`);
+const actualPythonParts = actualPython.split(".").map((part) => Number.parseInt(part, 10));
+const minimumPythonParts = (pythonEntry?.minimum_version ?? "").split(".").map((part) => Number.parseInt(part, 10));
+const pythonFamily = actualPythonParts.slice(0, 2).join(".");
+const pythonAtLeastMinimum = versionAtLeast(actualPythonParts, minimumPythonParts);
+if (!pythonEntry || pythonEntry.version_family !== pythonFamily || !pythonAtLeastMinimum) {
+  fail(`toolchain Python version mismatch: family=${pythonEntry?.version_family ?? "missing"}, minimum=${pythonEntry?.minimum_version ?? "missing"}, actual=${actualPython}`);
 }
 
 if (problems.length > 0) {
