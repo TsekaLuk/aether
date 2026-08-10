@@ -10,11 +10,13 @@ Key entry points:
 - `grammar/K0.ebnf`: draft K0 surface grammar.
 - `core/`: static, dynamic, memory, numeric, error, and transition schemas.
 - `rules/K0.json`: complete K0/MEM traceability index, including explicit gaps.
-- `conformance/`: semantic, source, layer, and metamorphic oracles.
+- `conformance/`: semantic, source, package, resolution, layer, historical, and
+  metamorphic oracles.
 - `decisions/`: provisional LDRs.
 - `proof/`: theorem ledger, trusted-base statement, and Lean fragments.
 - `manifests/spec.lock.json`: generated content lock.
 
-The parser and executor probes in `../tools/` validate documented subsets. They
-are not normative, are not a production frontend/runtime, and cannot promote a
-rule without the corresponding normative semantics and proof obligations.
+The parser, resolver, and executor probes in `../tools/` validate documented
+subsets. They are not normative, are not a production frontend/runtime, and
+cannot promote a rule without the corresponding normative semantics and proof
+obligations.

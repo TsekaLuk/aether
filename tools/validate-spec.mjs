@@ -5,6 +5,7 @@ import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { execute as executeNode } from "./executor-node.mjs";
 import { parse as parseNode, parseBytes as parseNodeBytes } from "./parser-node.mjs";
+import { resolvePackage as resolveNodePackage } from "./resolver-node.mjs";
 import { unclosedObjectSchemas, validateSchema } from "./json-schema.mjs";
 
 const packageRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -12,6 +13,7 @@ const specRoot = path.join(packageRoot, "spec");
 const prdPath = path.join(packageRoot, "docs/prd/Aether-PRD-v0.3.md");
 const pythonExecutor = path.join(packageRoot, "tools/executor-python.py");
 const pythonParser = path.join(packageRoot, "tools/parser-python.py");
+const pythonResolver = path.join(packageRoot, "tools/resolver-python.py");
 const pythonCommand = process.env.AETHER_PYTHON || "python3";
 const problems = [];
 
@@ -52,6 +54,158 @@ function stableJson(value) {
 
 function sha256(data) {
   return crypto.createHash("sha256").update(data).digest("hex");
+}
+
+function shortIdentity(prefix, domain, ...parts) {
+  return `${prefix}:${sha256([domain, ...parts.map(String)].join("\0")).slice(0, 16)}`;
+}
+
+function auditResolvedAsr(asr, target) {
+  const errors = [];
+  const symbols = new Map();
+  const locals = new Map();
+  const lifetimes = new Map();
+  const contracts = new Map();
+  const contractNames = new Set();
+  const localOrdinals = new Map();
+
+  function addIdentity(table, identity, expectedId, label) {
+    if (identity.id !== expectedId) errors.push(`${label} ${identity.id}: identity hash mismatch`);
+    if (table.has(identity.id)) errors.push(`${label} ${identity.id}: duplicate identity definition`);
+    table.set(identity.id, identity);
+  }
+
+  function collect(value) {
+    if (!value || typeof value !== "object") return;
+    if (Array.isArray(value)) {
+      value.forEach(collect);
+      return;
+    }
+    if (typeof value.id === "string" && value.id.startsWith("sym:") &&
+        typeof value.package === "string" && typeof value.module === "string" &&
+        typeof value.namespace === "string" && typeof value.name === "string" && typeof value.kind === "string") {
+      addIdentity(
+        symbols,
+        value,
+        shortIdentity("sym", "aether-k0-symbol", value.package, value.module, value.namespace, value.name, value.kind),
+        "symbol",
+      );
+    } else if (typeof value.id === "string" && value.id.startsWith("local:") &&
+               typeof value.function === "string" && typeof value.kind === "string" &&
+               Number.isInteger(value.ordinal) && typeof value.name === "string") {
+      addIdentity(
+        locals,
+        value,
+        shortIdentity("local", "aether-k0-local", value.function, value.kind, value.ordinal, value.name),
+        "local",
+      );
+      const ordinals = localOrdinals.get(value.function) ?? [];
+      ordinals.push(value.ordinal);
+      localOrdinals.set(value.function, ordinals);
+    } else if (typeof value.id === "string" && value.id.startsWith("life:") &&
+               typeof value.function === "string" && typeof value.label === "string") {
+      addIdentity(
+        lifetimes,
+        value,
+        shortIdentity("life", "aether-k0-lifetime", value.function, value.label),
+        "lifetime",
+      );
+    } else if (typeof value.id === "string" && value.id.startsWith("contract:") &&
+               typeof value.package === "string" && typeof value.module === "string" &&
+               typeof value.owner === "string" && typeof value.kind === "string" && typeof value.name === "string") {
+      addIdentity(
+        contracts,
+        value,
+        shortIdentity("contract", "aether-k0-contract", value.package, value.module, value.owner, value.kind, value.name),
+        "contract",
+      );
+      if (contractNames.has(value.name)) errors.push(`contract ${value.name}: duplicate package identity`);
+      contractNames.add(value.name);
+    }
+    for (const child of Object.values(value)) collect(child);
+  }
+
+  const modulePaths = (asr.modules ?? []).map((module) => module.path);
+  const sortedModulePaths = [...modulePaths].sort((left, right) => left < right ? -1 : left > right ? 1 : 0);
+  if (stableJson(modulePaths) !== stableJson(sortedModulePaths)) errors.push("modules are not in ASCII path order");
+  collect(asr);
+
+  const entry = symbols.get(asr.entry);
+  if (!entry) errors.push(`${asr.entry}: unresolved package entry`);
+  else if (entry.kind !== "function" || entry.namespace !== "value") {
+    errors.push(`${asr.entry}: package entry is not a function value`);
+  }
+
+  for (const module of asr.modules ?? []) {
+    for (const item of module.items ?? []) {
+      if (item.identity.package !== asr.package_id || item.identity.module !== module.path ||
+          item.identity.kind !== item.kind ||
+          item.identity.namespace !== (["struct", "enum"].includes(item.kind) ? "type" : "value")) {
+        errors.push(`${module.path}:${item.identity.name}: item identity tuple mismatch`);
+      }
+      for (const variant of item.variants ?? []) {
+        if (variant.identity.package !== asr.package_id || variant.identity.module !== module.path ||
+            variant.identity.namespace !== "value" || variant.identity.kind !== "enum_variant") {
+          errors.push(`${module.path}:${variant.identity.name}: variant identity tuple mismatch`);
+        }
+      }
+    }
+  }
+
+  for (const [functionId, ordinals] of localOrdinals) {
+    const ordered = [...ordinals].sort((left, right) => left - right);
+    if (ordered.some((ordinal, index) => ordinal !== index)) {
+      errors.push(`${functionId}: local ordinals are not a contiguous preorder`);
+    }
+  }
+
+  const allowedBrands = new Set((target.allocators ?? []).map((entry) => entry.brand));
+  const allowedPrimitives = new Set((target.host_primitives ?? []).map((entry) => `primitive:${entry}`));
+  function check(value) {
+    if (typeof value === "string") {
+      if (value.startsWith("sym:") && !symbols.has(value)) errors.push(`${value}: unresolved symbol identity`);
+      if (value.startsWith("local:") && !locals.has(value)) errors.push(`${value}: unresolved local identity`);
+      if (value.startsWith("life:") && !lifetimes.has(value)) errors.push(`${value}: unresolved lifetime identity`);
+      if (value.startsWith("contract:") && !contracts.has(value)) errors.push(`${value}: unresolved contract identity`);
+      if (value.startsWith("brand:") && !allowedBrands.has(value)) errors.push(`${value}: brand is absent from target`);
+      if (value.startsWith("primitive:") && !allowedPrimitives.has(value)) errors.push(`${value}: primitive is absent from target`);
+      return;
+    }
+    if (!value || typeof value !== "object") return;
+    if (Array.isArray(value)) {
+      value.forEach(check);
+      return;
+    }
+    if (value.kind === "nominal" && symbols.get(value.symbol)?.namespace !== "type") {
+      errors.push(`${value.symbol}: nominal type does not reference the type namespace`);
+    }
+    if (value.kind === "symbol_ref") {
+      const identity = symbols.get(value.symbol);
+      if (identity?.namespace !== "value" || identity?.kind !== value.target_kind) {
+        errors.push(`${value.symbol}: value reference kind mismatch`);
+      }
+    }
+    if (value.kind === "record" && Object.hasOwn(value, "constructor")) {
+      const identity = symbols.get(value.constructor);
+      if (!identity || !["struct", "enum_variant"].includes(identity.kind)) {
+        errors.push(`${value.constructor}: invalid record constructor`);
+      }
+    }
+    if (["path_pattern", "variant_tuple_pattern", "variant_record_pattern"].includes(value.kind) &&
+        symbols.get(value.constructor)?.kind !== "enum_variant") {
+      errors.push(`${value.constructor}: pattern constructor is not an enum variant`);
+    }
+    if (value.identity?.id?.startsWith("contract:") && value.kind !== value.identity.kind) {
+      errors.push(`${value.identity.id}: contract kind differs from identity`);
+    }
+    if (value.expression_hash && value.expression) {
+      const expected = `sha256:${sha256(["aether-k0-contract-expression", stableJson(value.expression)].join("\0"))}`;
+      if (value.expression_hash !== expected) errors.push(`${value.identity?.id ?? "contract"}: expression hash mismatch`);
+    }
+    for (const child of Object.values(value)) check(child);
+  }
+  check(asr);
+  return [...new Set(errors)];
 }
 
 function versionAtLeast(actual, minimum) {
@@ -118,6 +272,8 @@ const vectorFiles = [
 const vectors = vectorFiles.flatMap((file) => readJson(file) ?? []);
 const vectorIds = requireUnique(vectors.map((vector) => vector.id), "conformance vector ID");
 const vectorsById = new Map(vectors.map((vector) => [vector.id, vector]));
+const resolutionCorpus = readJson(path.join(specRoot, "conformance/resolution/K0.json"));
+const resolutionLinkedIds = new Set(Object.values(resolutionCorpus?.rule_links ?? {}).flat());
 const referenceTarget = readJson(path.join(specRoot, "targets/k0-reference-64.json"));
 const targetAllocators = new Map((referenceTarget?.allocators ?? []).map((allocator) => [allocator.name, allocator]));
 
@@ -145,8 +301,14 @@ for (const vector of vectors) {
 for (const rule of rules) {
   for (const testId of rule.tests) {
     const vector = vectorsById.get(testId);
-    if (!vector) fail(`${rule.id}: linked test does not exist: ${testId}`);
-    else if (!vector.rules.includes(rule.id)) fail(`${rule.id}: test ${testId} does not link back to rule`);
+    if (vector) {
+      if (!vector.rules.includes(rule.id)) fail(`${rule.id}: test ${testId} does not link back to rule`);
+      continue;
+    }
+    if (!resolutionLinkedIds.has(testId)) fail(`${rule.id}: linked test does not exist: ${testId}`);
+    else if (!(resolutionCorpus.rule_links[rule.id] ?? []).includes(testId)) {
+      fail(`${rule.id}: resolution test ${testId} does not link back to rule`);
+    }
   }
 }
 
@@ -283,12 +445,19 @@ for (const vector of vectors) {
 
 const layerCorpus = readJson(path.join(specRoot, "conformance/layer/K0.json"));
 let schemaLayerRejections = 0;
-for (const [index, value] of (layerCorpus?.asr?.accept ?? []).entries()) {
-  const schemaErrors = validateSchema(asrSchema, value);
-  if (schemaErrors.length > 0) fail(`layer.asr.accept.${index}: ASR schema rejected K0 value: ${schemaErrors[0]}`);
+const layerAsrFixture = layerCorpus?.asr?.fixture;
+const layerAsrFixtureErrors = validateSchema(asrSchema, layerAsrFixture);
+if (layerAsrFixtureErrors.length > 0) fail(`layer.asr.fixture: ASR schema rejected K0 value: ${layerAsrFixtureErrors[0]}`);
+function applyMutation(fixture, mutation) {
+  const value = structuredClone(fixture);
+  let target = value;
+  for (const component of mutation.path.slice(0, -1)) target = target[component];
+  target[mutation.path.at(-1)] = mutation.value;
+  return value;
 }
 for (const testCase of layerCorpus?.asr?.reject ?? []) {
-  if (validateSchema(asrSchema, testCase.value).length === 0) fail(`${testCase.id}: ASR schema accepted later-layer data`);
+  const value = applyMutation(layerAsrFixture, testCase.mutation);
+  if (validateSchema(asrSchema, value).length === 0) fail(`${testCase.id}: ASR schema accepted later-layer data`);
   else schemaLayerRejections += 1;
 }
 for (const testCase of layerCorpus?.core?.reject ?? []) {
@@ -322,6 +491,140 @@ let packageBoundaryRejections = 0;
 for (const testCase of packageCorpus?.reject ?? []) {
   if (packageErrors(testCase.value).length === 0) fail(`${testCase.id}: package boundary accepted forbidden input`);
   else packageBoundaryRejections += 1;
+}
+
+const resolutionCases = [
+  ...(resolutionCorpus?.accept ?? []),
+  ...(resolutionCorpus?.reject ?? []),
+  ...(resolutionCorpus?.equivalent ?? []).flatMap((group) =>
+    group.inputs.map((input, index) => ({ ...input, id: `${group.id}.${index}` }))),
+];
+requireUnique(resolutionCases.map((entry) => entry.id), "resolution conformance ID");
+const resolutionIds = new Set(resolutionCases.map((entry) => entry.id));
+for (const [ruleId, testIds] of Object.entries(resolutionCorpus?.rule_links ?? {})) {
+  if (!indexedRuleIds.has(ruleId)) fail(`resolution rule link references unindexed rule: ${ruleId}`);
+  for (const testId of testIds) {
+    if (!resolutionIds.has(testId)) fail(`${ruleId}: resolution link references absent test ${testId}`);
+    const rule = rules.find((entry) => entry.id === ruleId);
+    if (!rule?.tests.includes(testId)) fail(`${ruleId}: resolution test ${testId} is not indexed by the rule`);
+  }
+}
+
+function resolutionInput(testCase) {
+  return {
+    manifest: {
+      schema: "aether.package/k0-0.4",
+      language_version: "0.4.0-draft",
+      package_id: testCase.package_id,
+      target: "k0-reference-64",
+      modules: testCase.modules,
+      entry: testCase.entry,
+    },
+    target: referenceTarget,
+    sources: testCase.sources,
+  };
+}
+
+function resolveWithPython(testCase) {
+  const python = spawnSync(pythonCommand, [pythonResolver], {
+    input: JSON.stringify(resolutionInput(testCase)),
+    encoding: "utf8",
+    maxBuffer: 32 * 1024 * 1024,
+  });
+  if (python.status !== 0) {
+    fail(`${testCase.id}: Python resolver failed: ${python.stderr.trim()}`);
+    return null;
+  }
+  try {
+    return JSON.parse(python.stdout);
+  } catch (error) {
+    fail(`${testCase.id}: Python resolver returned invalid JSON: ${error.message}`);
+    return null;
+  }
+}
+
+let resolutionAgreement = 0;
+let resolvedAsrValidated = 0;
+let resolvedAsrIdentityAudits = 0;
+for (const testCase of resolutionCases) {
+  const input = resolutionInput(testCase);
+  if (!testCase.expect) {
+    const manifestProblems = packageErrors(input.manifest);
+    if (manifestProblems.length > 0) fail(`${testCase.id}: resolution fixture has invalid package manifest: ${manifestProblems[0]}`);
+  }
+  const nodeResult = resolveNodePackage(input);
+  const pythonResult = resolveWithPython(testCase);
+  if (!pythonResult) continue;
+  if (stableJson(nodeResult) !== stableJson(pythonResult)) {
+    fail(`${testCase.id}: independent resolver disagreement`);
+    continue;
+  }
+  resolutionAgreement += 1;
+  if (testCase.expect) {
+    if (!errorCodes.has(testCase.expect.code)) fail(`${testCase.id}: unknown resolution error code ${testCase.expect.code}`);
+    if (nodeResult.status !== "rejected" || nodeResult.phase !== "resolve") {
+      fail(`${testCase.id}: expected resolution rejection`);
+      continue;
+    }
+    for (const field of ["code", "module", "subject"]) {
+      if (nodeResult[field] !== testCase.expect[field]) {
+        fail(`${testCase.id}: expected ${field}=${testCase.expect[field]}, got ${nodeResult[field] ?? "missing"}`);
+      }
+    }
+  } else {
+    if (nodeResult.status !== "accepted") {
+      fail(`${testCase.id}: expected resolution acceptance, got ${nodeResult.code}`);
+      continue;
+    }
+    const schemaErrors = validateSchema(asrSchema, nodeResult.asr);
+    if (schemaErrors.length > 0) fail(`${testCase.id}: resolved ASR failed closed schema: ${schemaErrors[0]}`);
+    else {
+      resolvedAsrValidated += 1;
+      const auditErrors = auditResolvedAsr(nodeResult.asr, referenceTarget);
+      if (auditErrors.length > 0) fail(`${testCase.id}: resolved ASR identity audit failed: ${auditErrors[0]}`);
+      else resolvedAsrIdentityAudits += 1;
+    }
+  }
+}
+
+let resolutionEquivalence = 0;
+for (const group of resolutionCorpus?.equivalent ?? []) {
+  const outputs = group.inputs.map((input) => resolveNodePackage(resolutionInput(input)));
+  if (outputs.some((output) => output.status !== "accepted")) {
+    fail(`${group.id}: equivalent resolution input was rejected`);
+    continue;
+  }
+  if (new Set(outputs.map((output) => stableJson(output.asr))).size !== 1) {
+    fail(`${group.id}: equivalent package inputs produced different resolved ASR`);
+    continue;
+  }
+  resolutionEquivalence += 1;
+}
+
+let resolvedAsrMutationRejections = 0;
+const resolutionAcceptById = new Map((resolutionCorpus?.accept ?? []).map((entry) => [entry.id, entry]));
+for (const mutation of resolutionCorpus?.asr_mutations ?? []) {
+  const fixture = resolutionAcceptById.get(mutation.base);
+  if (!fixture) {
+    fail(`${mutation.id}: resolution ASR mutation has no base fixture ${mutation.base}`);
+    continue;
+  }
+  const resolved = resolveNodePackage(resolutionInput(fixture));
+  if (resolved.status !== "accepted") {
+    fail(`${mutation.id}: base fixture did not resolve`);
+    continue;
+  }
+  const mutatedAsr = applyMutation(resolved.asr, mutation);
+  const schemaErrors = validateSchema(asrSchema, mutatedAsr);
+  if (schemaErrors.length > 0) {
+    fail(`${mutation.id}: identity mutation was not structurally valid: ${schemaErrors[0]}`);
+    continue;
+  }
+  if (auditResolvedAsr(mutatedAsr, referenceTarget).length === 0) {
+    fail(`${mutation.id}: resolved ASR identity audit accepted semantic tampering`);
+    continue;
+  }
+  resolvedAsrMutationRejections += 1;
 }
 
 for (const decisionFile of allFiles(path.join(specRoot, "decisions")).filter((file) => file.endsWith(".json"))) {
@@ -514,13 +817,13 @@ const tcRequirementsPresent = [
 
 const checks = [
   { id: "G0-01", status: "PASS", requirement: "content-addressed spec.lock", evidence: `sha256:${lock.root_hash}` },
-  { id: "G0-02", status: "FAIL", requirement: "complete K0 Core grammar and static/dynamic semantics", evidence: `${sourceParserAgreement}/${sourceCases.length} source cases agree across two parsers; name resolution, lowering, and full expression/control-flow semantics remain incomplete` },
+  { id: "G0-02", status: "FAIL", requirement: "complete K0 Core grammar and static/dynamic semantics", evidence: `${sourceParserAgreement}/${sourceCases.length} source cases parse and ${resolutionAgreement}/${resolutionCases.length} package cases resolve across independent implementations; field resolution, lowering, and full expression/control-flow semantics remain incomplete` },
   { id: "G0-03", status: "FAIL", requirement: "complete object/resource state machines", evidence: "move, borrow, allocation, deallocation, and leak subset executes; fields, arrays, calls, joins, and numeric states remain OPEN" },
   { id: "G0-04", status: missingK0Rules.length === 0 && evidenceGapRules.length === 0 && stableRules.length === k0Required.length ? "PASS" : "FAIL", requirement: "every frozen K0 Rule ID linked to conformance evidence", evidence: `${requiredRules.length}/${k0Required.length} K0/MEM rules indexed; ${evidenceBearingRules.length} evidence-bearing; ${evidenceGapRules.length} explicit gaps; ${stableRules.length} marked STABLE` },
   { id: "G0-05", status: executorAgreement === vectors.length ? "PASS" : "FAIL", requirement: "two independent Core executors agree", evidence: `${executorAgreement}/${vectors.length} vectors agree byte-for-structure` },
   { id: "G0-06", status: provedTheorems >= 9 ? "PASS" : "FAIL", requirement: "mechanized metatheory repository", evidence: `Lean 4 v4.24.0 and pinned independent replay are locked; ${provedFragments} theorem fragments are encoded but ${provedTheorems}/9 required full K0 theorems are PROVED` },
   { id: "G0-07", status: "PASS", requirement: "host toolchain and initial TCB recorded", evidence: "Node/Python hosts and Lean proof tool are pinned; no npm, Python, or Lean package dependency" },
-  { id: "G0-08", status: "FAIL", requirement: "K1/K2 unreachable from K0 stable entry", evidence: `${generatedLayerCases.length}/${generatedLayerCases.length} lexical mutations, ${packageBoundaryRejections}/${packageCorpus?.reject?.length ?? 0} package probes, and ${schemaLayerRejections}/${(layerCorpus?.asr?.reject?.length ?? 0) + (layerCorpus?.core?.reject?.length ?? 0)} ASR/Core smuggling probes reject; resolved-ASR reachability proof remains incomplete` },
+  { id: "G0-08", status: "FAIL", requirement: "K1/K2 unreachable from K0 stable entry", evidence: `${generatedLayerCases.length}/${generatedLayerCases.length} lexical mutations, ${packageBoundaryRejections}/${packageCorpus?.reject?.length ?? 0} package probes, ${schemaLayerRejections}/${(layerCorpus?.asr?.reject?.length ?? 0) + (layerCorpus?.core?.reject?.length ?? 0)} structural smuggling probes, and ${resolvedAsrMutationRejections}/${resolutionCorpus?.asr_mutations?.length ?? 0} identity mutations reject; ${resolvedAsrIdentityAudits} resolved ASRs pass closure audits, but field/lowering reachability remains incomplete` },
   { id: "G0-09", status: tcRequirementsPresent ? "PASS" : "FAIL", requirement: "K1 computation-universality requirements frozen without expanding K0", evidence: tcRequirementsPresent ? "EXEC-001..008 and TC-001..008 exist in parent PRD" : "required TC rules missing" },
   { id: "G0-10", status: "PASS", requirement: "offline-readable review and OPEN inventory", evidence: `${openMarkers} explicit OPEN markers; report and lock are local files` },
 ];
@@ -542,6 +845,12 @@ const report = {
     independent_parser_agreements: sourceParserAgreement,
     raw_source_cases: sourceCorpus?.raw_reject?.length ?? 0,
     raw_source_parser_agreements: rawSourceParserAgreement,
+    resolution_cases: resolutionCases.length,
+    independent_resolver_agreements: resolutionAgreement,
+    resolved_asr_schema_validations: resolvedAsrValidated,
+    resolved_asr_identity_audits: resolvedAsrIdentityAudits,
+    resolved_asr_identity_mutations_rejected: resolvedAsrMutationRejections,
+    resolution_equivalence_groups: resolutionEquivalence,
     reserved_layer_tokens_rejected: rejectedReservedTokens.size,
     generated_layer_mutations_rejected: generatedLayerCases.length,
     schema_layer_smuggling_probes_rejected: schemaLayerRejections,
@@ -576,6 +885,11 @@ const markdown = `# Aether K0 G0 Report\n\n` +
   `- Independent executor agreements: ${executorAgreement}/${vectors.length}\n` +
   `- Independent parser agreements: ${sourceParserAgreement}/${sourceCases.length}\n` +
   `- Raw-byte parser agreements: ${rawSourceParserAgreement}/${sourceCorpus?.raw_reject?.length ?? 0}\n` +
+  `- Independent resolver agreements: ${resolutionAgreement}/${resolutionCases.length}\n` +
+  `- Resolved ASR schema validations: ${resolvedAsrValidated}\n` +
+  `- Resolved ASR identity-closure audits: ${resolvedAsrIdentityAudits}\n` +
+  `- Resolved ASR identity mutations rejected: ${resolvedAsrMutationRejections}/${resolutionCorpus?.asr_mutations?.length ?? 0}\n` +
+  `- Resolution equivalence groups: ${resolutionEquivalence}/${resolutionCorpus?.equivalent?.length ?? 0}\n` +
   `- Reserved layer tokens rejected: ${rejectedReservedTokens.size}/${reservedTokens.size}\n` +
   `- Generated layer mutations rejected: ${generatedLayerCases.length}/${generatedLayerCases.length}\n` +
   `- ASR/Core smuggling probes rejected: ${schemaLayerRejections}/${(layerCorpus?.asr?.reject?.length ?? 0) + (layerCorpus?.core?.reject?.length ?? 0)}\n` +
@@ -601,6 +915,10 @@ process.stdout.write(`- Conformance vectors: ${vectors.length}\n`);
 process.stdout.write(`- Independent executor agreements: ${executorAgreement}/${vectors.length}\n`);
 process.stdout.write(`- Independent parser agreements: ${sourceParserAgreement}/${sourceCases.length}\n`);
 process.stdout.write(`- Raw-byte parser agreements: ${rawSourceParserAgreement}/${sourceCorpus?.raw_reject?.length ?? 0}\n`);
+process.stdout.write(`- Independent resolver agreements: ${resolutionAgreement}/${resolutionCases.length}\n`);
+process.stdout.write(`- Resolved ASR schema validations: ${resolvedAsrValidated}\n`);
+process.stdout.write(`- Resolved ASR identity-closure audits: ${resolvedAsrIdentityAudits}\n`);
+process.stdout.write(`- Resolved ASR identity mutations rejected: ${resolvedAsrMutationRejections}/${resolutionCorpus?.asr_mutations?.length ?? 0}\n`);
 process.stdout.write(`- Layer boundary probes: ${generatedLayerCases.length + schemaLayerRejections + packageBoundaryRejections}/${generatedLayerCases.length + schemaLayerRejections + packageBoundaryRejections}\n`);
 process.stdout.write(`- Mechanized proof fragments: ${provedFragments}\n`);
 process.stdout.write(`- spec.lock root: sha256:${lock.root_hash}\n`);

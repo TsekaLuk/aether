@@ -12,11 +12,15 @@
     "conformance/reject",
     "conformance/observe",
     "conformance/metamorphic",
-    "conformance/historical"
+    "conformance/historical",
+    "conformance/source",
+    "conformance/package",
+    "conformance/resolution",
+    "conformance/layer"
   ],
   "open_blockers": [
-    "complete source parser and independent parser",
-    "complete ASR node schema and canonical serialization",
+    "source-byte spans and statically resolved field identities in ASR",
+    "deterministic resolved-ASR to Core lowering",
     "complete Core expression and control-flow evaluator",
     "normative borrow liveness algorithm",
     "normative numeric widening algorithm",
