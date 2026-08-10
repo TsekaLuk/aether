@@ -13,8 +13,10 @@ Work is ordered by semantic dependency, not implementation convenience.
   scope, visibility, lifetime, contract, target-brand, and entry resolution.
 - Done: accepted resolver output passes a closed ASR schema and recomputed
   identity/reference-closure audit.
-- Next: add source byte spans and statically resolved field identities, then
-  define deterministic resolved-ASR-to-Core lowering.
+- Done: a companion source map binds every source-derived ASR object to exact
+  original UTF-8 bytes without contaminating semantic ASR hashes.
+- Next: add statically resolved field identities, then define deterministic
+  resolved-ASR-to-Core lowering with provenance propagation.
 
 ## 2. G0-03: complete object/resource states
 
@@ -47,6 +49,8 @@ Work is ordered by semantic dependency, not implementation convenience.
   smuggling probes reject.
 - Done for the current resolved-ASR identity boundary: entry, symbol, local,
   lifetime, contract, target-brand, and host-primitive tampering rejects.
+- Done for the current source-provenance boundary: hashes, pointers, ranges,
+  origin, coverage, module ownership, and UTF-8 boundaries audit independently.
 - Prove later-layer nodes are unreachable from a K0 source/package manifest.
 - Add mutation tests that attempt to smuggle effects, capabilities, concurrency,
   user `unsafe`, and FFI into K0 artifacts.

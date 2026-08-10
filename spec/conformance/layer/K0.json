@@ -60,6 +60,37 @@
       }
     ]
   },
+  "source_map": {
+    "fixture": {
+      "schema": "aether.source-map/k0-0.4",
+      "language_version": "0.4.0-draft",
+      "asr_schema": "aether.asr/k0-0.4",
+      "asr_hash": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+      "package_id": "boundary",
+      "sources": [
+        {
+          "path": "src/boundary.ae",
+          "sha256": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+          "byte_length": 32
+        }
+      ],
+      "entries": [
+        {
+          "pointer": "/modules/0",
+          "source": "src/boundary.ae",
+          "start": 0,
+          "end": 32,
+          "origin": "source"
+        }
+      ]
+    },
+    "reject": [
+      {
+        "id": "source-map.effects-field",
+        "mutation": { "path": ["effects"], "value": ["io"] }
+      }
+    ]
+  },
   "core": {
     "reject": [
       {

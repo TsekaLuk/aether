@@ -30,6 +30,7 @@ Completed G0 prerequisites:
 
 - Dual source-parser agreement and lexical layer rejection corpus.
 - Deterministic package name resolution with independent implementation agreement.
+- Exact UTF-8 byte provenance in an independently audited companion source map.
 - Closed resolved-ASR/Core object schemas with identity audits and structured
   smuggling probes.
 - Full 69-rule traceability index with explicit gaps.

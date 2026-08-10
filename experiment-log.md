@@ -39,6 +39,14 @@
 - A Python 3.9 CI run exposed generated parser bytecode entering `spec.lock`.
   Disabled bytecode writes in the resolver and excluded `__pycache__`/`.pyc`
   artifacts from the lock input boundary; source artifacts remain locked.
+- Rejected inline ASR spans because trivia would contaminate semantic identity.
+  Implemented LCP-0003 as an orthogonal companion source-map experiment instead.
+- Independent parsers agreed on every syntax provenance map, including source
+  following a multibyte UTF-8 comment. Twelve resolved packages passed exact
+  source inventory, pointer coverage, byte-boundary, origin, ownership, and
+  ancestor-containment audits; all 7 schema-valid map mutations rejected.
+- Preserved the next blocker explicitly: field projection identity still
+  requires a static elaboration pass and was not guessed by name resolution.
 - Locked replay-compatible Lean 4.24.0 at upstream commit `797c613...`, built
   the allocation-cell model, and replayed 44,846 declarations with pinned
   `lean4checker` and Nanoda chains. Four results remain `PROVED_FRAGMENT`; no

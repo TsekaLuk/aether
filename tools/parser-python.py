@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import hashlib
 import json
 import re
 import sys
@@ -71,6 +72,13 @@ def integer_value(text, start, end):
 
 def tokenize(source):
     tokens = []
+    byte_offsets = [0]
+    for scalar in source:
+        byte_offsets.append(byte_offsets[-1] + len(scalar.encode("utf-8")))
+
+    def byte(offset):
+        return byte_offsets[offset]
+
     index = 0
     length = len(source)
     while index < length:
@@ -87,20 +95,20 @@ def tokenize(source):
             start = index
             end = source.find("*/", index + 2)
             if end < 0:
-                lexical_error("LEX-UNTERMINATED-COMMENT", start, length)
+                lexical_error("LEX-UNTERMINATED-COMMENT", byte(start), byte(length))
             index = end + 2
             continue
         if char == "'":
             start = index
             index += 1
             if index >= length or not re.match(r"[A-Za-z_]", source[index]):
-                lexical_error("LEX-INVALID-TOKEN", start, index, "'")
+                lexical_error("LEX-INVALID-TOKEN", byte(start), byte(index), "'")
             index += 1
             while index < length and re.match(r"[A-Za-z0-9_]", source[index]):
                 index += 1
             tokens.append({
                 "kind": "LIFETIME", "text": source[start:index],
-                "start": start, "end": index,
+                "start": byte(start), "end": byte(index),
             })
             continue
         if re.match(r"[A-Za-z_]", char):
@@ -110,13 +118,15 @@ def tokenize(source):
                 index += 1
             text = source[start:index]
             if text in RESERVED:
-                error = K0Error("lexical", "LAYER-FEATURE-DISABLED", start, index, text)
+                error = K0Error(
+                    "lexical", "LAYER-FEATURE-DISABLED", byte(start), byte(index), text
+                )
                 error.diagnostic["requested_layer"] = "K0"
                 error.diagnostic["available_since"] = RESERVED[text]
                 raise error
             tokens.append({
                 "kind": "KEYWORD" if text in KEYWORDS else "IDENT",
-                "text": text, "start": start, "end": index,
+                "text": text, "start": byte(start), "end": byte(index),
             })
             continue
         if char.isdigit() and ord(char) < 128:
@@ -127,20 +137,23 @@ def tokenize(source):
             text = source[start:index]
             tokens.append({
                 "kind": "INTEGER", "text": text,
-                "value": integer_value(text, start, index),
-                "start": start, "end": index,
+                "value": integer_value(text, byte(start), byte(index)),
+                "start": byte(start), "end": byte(index),
             })
             continue
         punctuator = next((item for item in PUNCTUATORS if source.startswith(item, index)), None)
         if punctuator is not None:
             tokens.append({
                 "kind": "PUNCT", "text": punctuator,
-                "start": index, "end": index + len(punctuator),
+                "start": byte(index), "end": byte(index + len(punctuator)),
             })
             index += len(punctuator)
             continue
-        lexical_error("LEX-INVALID-TOKEN", index, index + len(char.encode("utf-8")), char)
-    tokens.append({"kind": "EOF", "text": "<eof>", "start": length, "end": length})
+        lexical_error("LEX-INVALID-TOKEN", byte(index), byte(index + 1), char)
+    tokens.append({
+        "kind": "EOF", "text": "<eof>",
+        "start": byte(length), "end": byte(length),
+    })
     return tokens
 
 
@@ -151,6 +164,12 @@ class Parser:
 
     def current(self):
         return self.tokens[self.index]
+
+    def mark(self, start, value, end=None, origin="source"):
+        if end is None:
+            end = self.tokens[max(0, self.index - 1)]["end"]
+        value["_span"] = {"start": start, "end": end, "origin": origin}
+        return value
 
     def at(self, text):
         return self.current()["text"] == text
@@ -264,19 +283,27 @@ class Parser:
             if self.at("invariant"):
                 invariants.append(self.invariant())
                 continue
+            variant_start = self.current()["start"]
             variant_name = self.identifier()
-            payload = {"kind": "unit"}
+            payload = self.mark(variant_start, {"kind": "unit"})
             if self.take("("):
+                payload_start = self.tokens[self.index - 1]["start"]
                 payload = {"kind": "tuple", "types": self.type_list(")")}
                 self.expect(")")
+                self.mark(payload_start, payload)
             elif self.take("{"):
+                payload_start = self.tokens[self.index - 1]["start"]
                 fields = []
                 while not self.at("}"):
                     fields.append(self.field_decl())
                 self.expect("}")
                 payload = {"kind": "record", "fields": fields}
+                self.mark(payload_start, payload)
             self.expect(",")
-            variants.append({"kind": "variant", "name": variant_name, "payload": payload})
+            variants.append(self.mark(
+                variant_start,
+                {"kind": "variant", "name": variant_name, "payload": payload},
+            ))
         self.expect("}")
         return {
             "kind": "enum", "visibility": visibility, "name": name,
@@ -289,27 +316,38 @@ class Parser:
         params = []
         if not self.at(")"):
             while True:
+                parameter_start = self.current()["start"]
                 param_name = self.identifier()
                 self.expect(":")
-                params.append({"name": param_name, "type": self.parse_type()})
+                params.append(self.mark(
+                    parameter_start,
+                    {"name": param_name, "type": self.parse_type()},
+                ))
                 if not self.take(","):
                     break
                 if self.at(")"):
                     break
         self.expect(")")
-        result = self.parse_type() if self.take("->") else {"kind": "primitive", "name": "unit"}
+        implicit_result_offset = self.tokens[self.index - 1]["end"]
+        result = self.parse_type() if self.take("->") else self.mark(
+            implicit_result_offset,
+            {"kind": "primitive", "name": "unit"},
+            implicit_result_offset,
+            "synthetic",
+        )
         contracts = []
         while self.at("requires") or self.at("ensures"):
+            contract_start = self.current()["start"]
             contract_kind = self.current()["text"]
             self.index += 1
             id_ = self.module_path()
             self.expect(":")
             expression = self.contract_expression()
             self.expect(";")
-            contracts.append({
+            contracts.append(self.mark(contract_start, {
                 "kind": contract_kind, "id": id_, "expression": expression,
                 "status": "DECLARED_UNPROVEN",
-            })
+            }))
         body = self.block()
         return {
             "kind": "function", "visibility": visibility, "name": name,
@@ -404,6 +442,7 @@ class Parser:
         while not self.at("}"):
             if self.current()["kind"] == "EOF":
                 self.error()
+            statement_start = self.current()["start"]
             if self.take("let"):
                 mutable = self.take("mut")
                 name = self.identifier()
@@ -411,31 +450,37 @@ class Parser:
                 self.expect("=")
                 value = self.expression()
                 self.expect(";")
-                statements.append({
+                statements.append(self.mark(statement_start, {
                     "kind": "let", "mutable": mutable, "name": name,
                     "annotation": annotation, "value": value,
-                })
+                }))
                 continue
             if self.take("return"):
                 value = None if self.at(";") else self.expression()
                 self.expect(";")
-                statements.append({"kind": "return", "value": value})
+                statements.append(self.mark(
+                    statement_start, {"kind": "return", "value": value}
+                ))
                 continue
             if self.take("while"):
                 condition = self.expression()
                 body = self.block()
-                statements.append({"kind": "while", "condition": condition, "body": body})
+                statements.append(self.mark(statement_start, {
+                    "kind": "while", "condition": condition, "body": body,
+                }))
                 continue
             if self.take("loop"):
-                statements.append({"kind": "loop", "body": self.block()})
+                statements.append(self.mark(
+                    statement_start, {"kind": "loop", "body": self.block()}
+                ))
                 continue
             if self.take("break"):
                 self.expect(";")
-                statements.append({"kind": "break"})
+                statements.append(self.mark(statement_start, {"kind": "break"}))
                 continue
             if self.take("continue"):
                 self.expect(";")
-                statements.append({"kind": "continue"})
+                statements.append(self.mark(statement_start, {"kind": "continue"}))
                 continue
             left = self.expression()
             if self.take("="):
@@ -443,9 +488,13 @@ class Parser:
                     self.error(self.tokens[self.index - 1])
                 value = self.expression()
                 self.expect(";")
-                statements.append({"kind": "assign", "place": left, "value": value})
+                statements.append(self.mark(statement_start, {
+                    "kind": "assign", "place": left, "value": value,
+                }))
             elif self.take(";"):
-                statements.append({"kind": "expression_statement", "expression": left})
+                statements.append(self.mark(statement_start, {
+                    "kind": "expression_statement", "expression": left,
+                }))
             elif self.at("}"):
                 tail = left
                 break
@@ -463,6 +512,7 @@ class Parser:
         return node["kind"] == "unary" and node["operator"] == "*"
 
     def expression(self, minimum=1):
+        start = self.current()["start"]
         left = self.unary_expression()
         while True:
             precedence = BINARY_PRECEDENCE.get(self.current()["text"], 0)
@@ -471,32 +521,47 @@ class Parser:
             operator = self.current()["text"]
             self.index += 1
             right = self.expression(precedence + 1)
-            left = {"kind": "binary", "operator": operator, "left": left, "right": right}
-        return left
+            left = self.mark(start, {
+                "kind": "binary", "operator": operator, "left": left, "right": right,
+            })
+        return self.mark(start, left)
 
     def unary_expression(self):
+        start = self.current()["start"]
         if self.at("!") or self.at("-") or self.at("move") or self.at("*"):
             operator = self.current()["text"]
             self.index += 1
-            return {"kind": "unary", "operator": operator, "value": self.unary_expression()}
+            return self.mark(start, {
+                "kind": "unary", "operator": operator,
+                "value": self.unary_expression(),
+            })
         if self.take("&"):
             mutable = self.take("mut")
-            return {"kind": "borrow", "mutable": mutable, "place": self.unary_expression()}
+            return self.mark(start, {
+                "kind": "borrow", "mutable": mutable,
+                "place": self.unary_expression(),
+            })
         value = self.primary()
         while True:
             if self.take("("):
                 arguments = self.expression_list(")")
                 self.expect(")")
-                value = {"kind": "call", "callee": value, "arguments": arguments}
+                value = self.mark(start, {
+                    "kind": "call", "callee": value, "arguments": arguments,
+                })
             elif self.take("."):
-                value = {"kind": "field", "base": value, "field": self.identifier()}
+                value = self.mark(start, {
+                    "kind": "field", "base": value, "field": self.identifier(),
+                })
             elif self.take("["):
                 index = self.expression()
                 self.expect("]")
-                value = {"kind": "index", "base": value, "index": index}
+                value = self.mark(start, {
+                    "kind": "index", "base": value, "index": index,
+                })
             else:
                 break
-        return value
+        return self.mark(start, value)
 
     def expression_list(self, end):
         values = []
@@ -518,11 +583,12 @@ class Parser:
             self.expect("{")
             fields = []
             while not self.at("}"):
+                field_start = self.current()["start"]
                 name = self.identifier()
                 self.expect(":")
                 value = self.expression()
                 self.expect(",")
-                fields.append({"name": name, "value": value})
+                fields.append(self.mark(field_start, {"name": name, "value": value}))
             self.expect("}")
             return {"kind": "record", "path": path, "fields": fields}
         if self.take("if"):
@@ -558,7 +624,12 @@ class Parser:
         then = self.block()
         otherwise = None
         if self.take("else"):
-            otherwise = self.if_expression() if self.take("if") else self.block()
+            if self.at("if"):
+                otherwise_start = self.current()["start"]
+                self.expect("if")
+                otherwise = self.mark(otherwise_start, self.if_expression())
+            else:
+                otherwise = self.block()
         return {"kind": "if", "condition": condition, "then": then, "otherwise": otherwise}
 
     def match_expression(self):
@@ -568,11 +639,14 @@ class Parser:
         if self.at("}"):
             self.error()
         while not self.at("}"):
+            arm_start = self.current()["start"]
             pattern = self.pattern()
             self.expect("=>")
             expression = self.expression()
             self.expect(",")
-            arms.append({"pattern": pattern, "expression": expression})
+            arms.append(self.mark(arm_start, {
+                "pattern": pattern, "expression": expression,
+            }))
         self.expect("}")
         return {"kind": "match", "value": value, "arms": arms}
 
@@ -609,16 +683,20 @@ class Parser:
         if self.take("{"):
             fields = []
             while not self.at("}"):
+                field_start = self.current()["start"]
                 name = self.identifier()
                 self.expect(":")
                 pattern = self.pattern()
                 self.expect(",")
-                fields.append({"name": name, "pattern": pattern})
+                fields.append(self.mark(field_start, {
+                    "name": name, "pattern": pattern,
+                }))
             self.expect("}")
             return {"kind": "variant_record_pattern", "path": path, "fields": fields}
         return {"kind": "path_pattern", "path": path}
 
     def contract_expression(self, minimum=1):
+        start = self.current()["start"]
         left = self.contract_unary()
         while True:
             precedence = CONTRACT_PRECEDENCE.get(self.current()["text"], 0)
@@ -627,34 +705,95 @@ class Parser:
             operator = self.current()["text"]
             self.index += 1
             right = self.contract_expression(precedence + 1)
-            left = {
+            left = self.mark(start, {
                 "kind": "contract_binary", "operator": operator,
                 "left": left, "right": right,
-            }
-        return left
+            })
+        return self.mark(start, left)
 
     def contract_unary(self):
+        start = self.current()["start"]
         if self.at("!") or self.at("-"):
             operator = self.current()["text"]
             self.index += 1
-            return {"kind": "contract_unary", "operator": operator, "value": self.contract_unary()}
+            return self.mark(start, {
+                "kind": "contract_unary", "operator": operator,
+                "value": self.contract_unary(),
+            })
         if self.current()["kind"] == "INTEGER" or self.at("true") or self.at("false"):
             return self.literal()
         if self.take("("):
             value = self.contract_expression()
             self.expect(")")
-            return value
+            return self.mark(start, value)
         symbol = self.symbol_path()
         fields = []
         while self.take("."):
             fields.append(self.identifier())
-        return {"kind": "contract_path", "symbol": symbol, "fields": fields}
+        return self.mark(start, {
+            "kind": "contract_path", "symbol": symbol, "fields": fields,
+        })
+
+
+def traced_parser_method(method):
+    def traced(self, *args, **kwargs):
+        start = self.current()["start"]
+        return self.mark(start, method(self, *args, **kwargs))
+    return traced
+
+
+for method_name in [
+    "parse_source", "item", "const_decl", "invariant", "field_decl",
+    "struct_decl", "enum_decl", "fn_decl", "parse_type", "integer_literal",
+    "literal", "block", "primary", "if_expression", "match_expression",
+    "pattern",
+]:
+    setattr(Parser, method_name, traced_parser_method(getattr(Parser, method_name)))
+
+
+def detach_locations(value, path, entries):
+    if isinstance(value, list):
+        return [
+            detach_locations(child, [*path, index], entries)
+            for index, child in enumerate(value)
+        ]
+    if not isinstance(value, dict):
+        return value
+    span = value.get("_span")
+    if span is not None:
+        entries.append({
+            "path": path,
+            "start": span["start"],
+            "end": span["end"],
+            "origin": span["origin"],
+        })
+    return {
+        key: detach_locations(value[key], [*path, key], entries)
+        for key in sorted(value)
+        if key != "_span"
+    }
+
+
+def accepted_parse(tree, source):
+    entries = []
+    detached_tree = detach_locations(tree, [], entries)
+    raw = source.encode("utf-8")
+    return {
+        "status": "accepted",
+        "tree": detached_tree,
+        "source_map": {
+            "schema": "aether.syntax-source-map/k0-0.4",
+            "source_sha256": f"sha256:{hashlib.sha256(raw).hexdigest()}",
+            "byte_length": len(raw),
+            "entries": entries,
+        },
+    }
 
 
 def parse(source):
     try:
         parser = Parser(tokenize(source))
-        return {"status": "accepted", "tree": parser.parse_source()}
+        return accepted_parse(parser.parse_source(), source)
     except K0Error as error:
         return error.diagnostic
 

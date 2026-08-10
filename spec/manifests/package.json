@@ -19,7 +19,7 @@
     "conformance/layer"
   ],
   "open_blockers": [
-    "source-byte spans and statically resolved field identities in ASR",
+    "statically resolved field identities in ASR",
     "deterministic resolved-ASR to Core lowering",
     "complete Core expression and control-flow evaluator",
     "normative borrow liveness algorithm",

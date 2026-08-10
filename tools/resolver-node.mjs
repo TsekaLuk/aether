@@ -39,6 +39,46 @@ function pathText(path) {
   return path.join("::");
 }
 
+function hydrateLocations(tree, sourceMap, source) {
+  for (const entry of sourceMap.entries) {
+    let node = tree;
+    for (const component of entry.path) node = node[component];
+    node._span = { source, start: entry.start, end: entry.end, origin: entry.origin };
+  }
+}
+
+function pointerComponent(component) {
+  return String(component).replaceAll("~", "~0").replaceAll("/", "~1");
+}
+
+function detachSources(value, path, entries) {
+  if (Array.isArray(value)) {
+    return value.map((child, index) => detachSources(child, [...path, index], entries));
+  }
+  if (!value || typeof value !== "object") return value;
+  if (value._source) {
+    entries.push({
+      pointer: path.length === 0 ? "" : `/${path.map(pointerComponent).join("/")}`,
+      ...value._source,
+    });
+  }
+  const output = {};
+  const keys = Object.keys(value)
+    .filter((key) => key !== "_source")
+    .sort((left, right) => left < right ? -1 : left > right ? 1 : 0);
+  for (const key of keys) output[key] = detachSources(value[key], [...path, key], entries);
+  return output;
+}
+
+function semanticValue(value) {
+  if (Array.isArray(value)) return value.map(semanticValue);
+  if (!value || typeof value !== "object") return value;
+  return Object.fromEntries(Object.keys(value)
+    .filter((key) => key !== "_source")
+    .sort((left, right) => left < right ? -1 : left > right ? 1 : 0)
+    .map((key) => [key, semanticValue(value[key])]));
+}
+
 class Resolver {
   constructor(input) {
     this.input = input;
@@ -53,6 +93,11 @@ class Resolver {
 
   error(code, module, subject) {
     throw new ResolveError(code, module, subject);
+  }
+
+  withSource(node, value) {
+    if (node?._span) value._source = { ...node._span };
+    return value;
   }
 
   symbol(module, namespace, name, kind) {
@@ -108,12 +153,14 @@ class Resolver {
       if (!(source in this.sources)) this.error("RESOLVE-SOURCE-MISSING", module, source);
       const parsed = parse(this.sources[source]);
       if (parsed.status !== "accepted") throw Object.assign(new Error(parsed.code), { diagnostic: parsed });
+      hydrateLocations(parsed.tree, parsed.source_map, source);
       const declaredModule = parsed.tree.module.join(".");
       if (declaredModule !== module) this.error("RESOLVE-MODULE-MISMATCH", module, declaredModule);
       this.modules.set(module, {
         path: module,
         source,
         tree: parsed.tree,
+        sourceMap: parsed.source_map,
         types: new Map(),
         values: new Map(),
       });
@@ -382,7 +429,10 @@ class Resolver {
         return {
           kind: "record",
           constructor: constructor.identity.id,
-          fields: node.fields.map((field) => ({ name: field.name, value: this.expression(field.value, context) })),
+          fields: node.fields.map((field) => this.withSource(field, {
+            name: field.name,
+            value: this.expression(field.value, context),
+          })),
         };
       }
       case "if": return {
@@ -399,7 +449,7 @@ class Resolver {
           const pattern = this.pattern(arm.pattern, context);
           const expression = this.expression(arm.expression, context);
           context.scopes.pop();
-          return { pattern, expression };
+          return this.withSource(arm, { pattern, expression });
         }),
       };
       case "block": return this.block(node, context);
@@ -426,7 +476,10 @@ class Resolver {
         return {
           kind: "variant_record_pattern",
           constructor: constructor.identity.id,
-          fields: node.fields.map((field) => ({ name: field.name, pattern: this.pattern(field.pattern, context) })),
+          fields: node.fields.map((field) => this.withSource(field, {
+            name: field.name,
+            pattern: this.pattern(field.pattern, context),
+          })),
         };
       }
       default: throw new Error(`unknown pattern kind: ${node.kind}`);
@@ -461,7 +514,9 @@ class Resolver {
   }
 
   contractExpression(node, context) {
-    if (node.kind === "integer" || node.kind === "boolean") return { ...node };
+    if (node.kind === "integer" || node.kind === "boolean") {
+      return { kind: node.kind, value: node.value };
+    }
     if (node.kind === "contract_unary") {
       return { kind: "contract_unary", operator: node.operator, value: this.contractExpression(node.value, context) };
     }
@@ -498,7 +553,7 @@ class Resolver {
       identity: contract._identity,
       kind: contract.kind,
       status: "DECLARED_UNPROVEN",
-      expression_hash: `sha256:${hash("aether-k0-contract-expression", stableJson(expression))}`,
+      expression_hash: `sha256:${hash("aether-k0-contract-expression", stableJson(semanticValue(expression)))}`,
       expression,
     };
   }
@@ -515,7 +570,11 @@ class Resolver {
       };
     }
     if (item.kind === "struct") {
-      const fields = item.fields.map((field) => ({ name: field.name, visibility: field.visibility, type: this.type(field.type, plainTypeContext) }));
+      const fields = item.fields.map((field) => this.withSource(field, {
+        name: field.name,
+        visibility: field.visibility,
+        type: this.type(field.type, plainTypeContext),
+      }));
       const fieldNames = new Set(item.fields.map((field) => field.name));
       return {
         kind: "struct",
@@ -530,13 +589,20 @@ class Resolver {
         kind: "enum",
         identity: item._identity,
         visibility: item.visibility,
-        variants: item.variants.map((variant) => ({
+        variants: item.variants.map((variant) => this.withSource(variant, {
           identity: variant._identity,
-          payload: variant.payload.kind === "unit"
+          payload: this.withSource(variant.payload, variant.payload.kind === "unit"
             ? { kind: "unit" }
             : variant.payload.kind === "tuple"
               ? { kind: "tuple", types: variant.payload.types.map((type) => this.type(type, plainTypeContext)) }
-              : { kind: "record", fields: variant.payload.fields.map((field) => ({ name: field.name, visibility: field.visibility, type: this.type(field.type, plainTypeContext) })) },
+              : {
+                  kind: "record",
+                  fields: variant.payload.fields.map((field) => this.withSource(field, {
+                    name: field.name,
+                    visibility: field.visibility,
+                    type: this.type(field.type, plainTypeContext),
+                  })),
+                }),
         })),
         invariants: item.invariants.map((contract) => this.contract(contract, { module, owner: item._identity.id, fields: new Set(), locals: new Map(), result: false })),
       };
@@ -548,7 +614,7 @@ class Resolver {
     const params = item.params.map((parameter) => {
       const type = this.type(parameter.type, typeContext);
       const binding = this.declareLocal(context, parameter.name, "parameter");
-      return { binding, type };
+      return this.withSource(parameter, { binding, type });
     });
     const contractLocals = new Map(params.map((parameter) => [parameter.binding.name, parameter.binding]));
     const contracts = item.contracts.map((contract) => this.contract(contract, {
@@ -591,23 +657,49 @@ class Resolver {
     this.prepareModules();
     this.collect();
     const entry = this.resolveEntry();
+    const rawAsr = {
+      schema: "aether.asr/k0-0.4",
+      language_version: "0.4.0-draft",
+      core_layer: "K0",
+      package_id: this.packageId,
+      target: this.target.id,
+      entry,
+      modules: [...this.modules.values()].map((moduleInfo) => this.withSource(moduleInfo.tree, {
+        path: moduleInfo.path,
+        source: moduleInfo.source,
+        items: moduleInfo.tree.items.map((item) => this.resolveItem(item, moduleInfo.path)),
+      })),
+    };
+    const sourceEntries = [];
+    const asr = detachSources(rawAsr, [], sourceEntries);
     return {
       status: "accepted",
-      asr: {
-        schema: "aether.asr/k0-0.4",
+      asr,
+      source_map: {
+        schema: "aether.source-map/k0-0.4",
         language_version: "0.4.0-draft",
-        core_layer: "K0",
+        asr_schema: "aether.asr/k0-0.4",
+        asr_hash: `sha256:${hash("aether-k0-resolved-asr", stableJson(asr))}`,
         package_id: this.packageId,
-        target: this.target.id,
-        entry,
-        modules: [...this.modules.values()].map((moduleInfo) => ({
-          path: moduleInfo.path,
-          source: moduleInfo.source,
-          items: moduleInfo.tree.items.map((item) => this.resolveItem(item, moduleInfo.path)),
-        })),
+        sources: [...this.modules.values()].map((moduleInfo) => ({
+          path: moduleInfo.source,
+          sha256: moduleInfo.sourceMap.source_sha256,
+          byte_length: moduleInfo.sourceMap.byte_length,
+        })).sort((left, right) => left.path < right.path ? -1 : left.path > right.path ? 1 : 0),
+        entries: sourceEntries,
       },
     };
   }
+}
+
+for (const methodName of [
+  "type", "expression", "pattern", "block", "statement",
+  "contractExpression", "contract", "resolveItem",
+]) {
+  const method = Resolver.prototype[methodName];
+  Resolver.prototype[methodName] = function sourceMappedResolverNode(node, ...args) {
+    return this.withSource(node, method.call(this, node, ...args));
+  };
 }
 
 export function resolvePackage(input) {

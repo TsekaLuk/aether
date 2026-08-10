@@ -61,6 +61,94 @@ function shortIdentity(prefix, domain, ...parts) {
   return `${prefix}:${sha256([domain, ...parts.map(String)].join("\0")).slice(0, 16)}`;
 }
 
+function pointerComponent(component) {
+  return String(component).replaceAll("~", "~0").replaceAll("/", "~1");
+}
+
+function objectPaths(value, path = [], output = []) {
+  if (Array.isArray(value)) {
+    value.forEach((child, index) => objectPaths(child, [...path, index], output));
+    return output;
+  }
+  if (!value || typeof value !== "object") return output;
+  output.push(path);
+  for (const key of Object.keys(value).sort((left, right) => left < right ? -1 : left > right ? 1 : 0)) {
+    objectPaths(value[key], [...path, key], output);
+  }
+  return output;
+}
+
+function valueAtPath(root, path) {
+  let value = root;
+  for (const component of path) {
+    if (value === null || value === undefined || !Object.hasOwn(value, component)) return undefined;
+    value = value[component];
+  }
+  return value;
+}
+
+function pathFromPointer(pointer) {
+  if (pointer === "") return [];
+  if (!pointer.startsWith("/")) return null;
+  return pointer.slice(1).split("/").map((component) => {
+    const decoded = component.replaceAll("~1", "/").replaceAll("~0", "~");
+    return /^(0|[1-9][0-9]*)$/.test(decoded) ? Number(decoded) : decoded;
+  });
+}
+
+function utf8Boundaries(source) {
+  const boundaries = new Set([0]);
+  let offset = 0;
+  for (const scalar of source) {
+    offset += Buffer.byteLength(scalar, "utf8");
+    boundaries.add(offset);
+  }
+  return boundaries;
+}
+
+function auditSyntaxSourceMap(result, source) {
+  if (result.status !== "accepted") return [];
+  const errors = [];
+  const sourceMap = result.source_map;
+  const bytes = Buffer.from(source, "utf8");
+  if (!sourceMap || sourceMap.schema !== "aether.syntax-source-map/k0-0.4") {
+    return ["accepted syntax tree has no K0 syntax source map"];
+  }
+  if (sourceMap.source_sha256 !== `sha256:${sha256(bytes)}`) errors.push("syntax source hash mismatch");
+  if (sourceMap.byte_length !== bytes.length) errors.push("syntax source byte length mismatch");
+  const expectedPaths = objectPaths(result.tree);
+  const actualPaths = sourceMap.entries.map((entry) => entry.path);
+  if (stableJson(actualPaths) !== stableJson(expectedPaths)) {
+    errors.push("syntax source map does not cover object preorder exactly");
+  }
+  const boundaries = utf8Boundaries(source);
+  const seen = new Set();
+  for (const entry of sourceMap.entries) {
+    const key = stableJson(entry.path);
+    if (seen.has(key)) errors.push(`${key}: duplicate syntax source path`);
+    seen.add(key);
+    if (!Array.isArray(entry.path) || valueAtPath(result.tree, entry.path) === undefined) {
+      errors.push(`${key}: dangling syntax source path`);
+    }
+    if (!Number.isInteger(entry.start) || !Number.isInteger(entry.end) ||
+        entry.start < 0 || entry.start > entry.end || entry.end > bytes.length) {
+      errors.push(`${key}: invalid syntax byte range`);
+      continue;
+    }
+    if (!boundaries.has(entry.start) || !boundaries.has(entry.end)) {
+      errors.push(`${key}: syntax range splits a UTF-8 scalar`);
+    }
+    if (entry.origin === "source" && entry.start === entry.end) {
+      errors.push(`${key}: source-origin syntax range is empty`);
+    } else if (entry.origin === "synthetic" && entry.start !== entry.end) {
+      errors.push(`${key}: synthetic syntax range is not empty`);
+    } else if (!new Set(["source", "synthetic"]).has(entry.origin)) {
+      errors.push(`${key}: unknown syntax origin`);
+    }
+  }
+  return [...new Set(errors)];
+}
+
 function auditResolvedAsr(asr, target) {
   const errors = [];
   const symbols = new Map();
@@ -209,6 +297,103 @@ function auditResolvedAsr(asr, target) {
   return [...new Set(errors)];
 }
 
+function pointerFromPath(path) {
+  return path.length === 0 ? "" : `/${path.map(pointerComponent).join("/")}`;
+}
+
+function requiresResolvedSource(path, value) {
+  if (path.length === 0) return false;
+  if (typeof value.id === "string") return false;
+  const last = path.at(-1);
+  if (last === "target" && new Set(["symbol", "local", "result", "field"]).has(value.kind)) {
+    return false;
+  }
+  return true;
+}
+
+function auditResolvedSourceMap(asr, sourceMap, inputSources) {
+  const errors = [];
+  if (sourceMap.package_id !== asr.package_id) errors.push("source-map package differs from ASR");
+  if (sourceMap.asr_schema !== asr.schema) errors.push("source-map ASR schema differs from ASR");
+  const expectedAsrHash = `sha256:${sha256(["aether-k0-resolved-asr", stableJson(asr)].join("\0"))}`;
+  if (sourceMap.asr_hash !== expectedAsrHash) errors.push("source-map semantic ASR hash mismatch");
+
+  const expectedSourcePaths = Object.keys(inputSources).sort((left, right) => left < right ? -1 : left > right ? 1 : 0);
+  const actualSourcePaths = (sourceMap.sources ?? []).map((source) => source.path);
+  if (stableJson(actualSourcePaths) !== stableJson(expectedSourcePaths)) {
+    errors.push("source inventory is not the exact ASCII-sorted package source set");
+  }
+  const sourceRecords = new Map();
+  const boundarySets = new Map();
+  for (const source of sourceMap.sources ?? []) {
+    if (sourceRecords.has(source.path)) errors.push(`${source.path}: duplicate source inventory entry`);
+    sourceRecords.set(source.path, source);
+    const input = inputSources[source.path];
+    if (input === undefined) continue;
+    const bytes = Buffer.from(input, "utf8");
+    if (source.sha256 !== `sha256:${sha256(bytes)}`) errors.push(`${source.path}: source hash mismatch`);
+    if (source.byte_length !== bytes.length) errors.push(`${source.path}: source byte length mismatch`);
+    boundarySets.set(source.path, utf8Boundaries(input));
+  }
+
+  const expectedPointers = objectPaths(asr)
+    .filter((path) => requiresResolvedSource(path, valueAtPath(asr, path)))
+    .map(pointerFromPath);
+  const actualPointers = (sourceMap.entries ?? []).map((entry) => entry.pointer);
+  if (stableJson(actualPointers) !== stableJson(expectedPointers)) {
+    errors.push("resolved source map does not cover ASR object preorder exactly");
+  }
+
+  const entriesByPointer = new Map();
+  for (const entry of sourceMap.entries ?? []) {
+    if (entriesByPointer.has(entry.pointer)) errors.push(`${entry.pointer}: duplicate source-map pointer`);
+    entriesByPointer.set(entry.pointer, entry);
+    const path = pathFromPointer(entry.pointer);
+    const value = path === null ? undefined : valueAtPath(asr, path);
+    if (path === null || !value || typeof value !== "object" || Array.isArray(value)) {
+      errors.push(`${entry.pointer}: source-map pointer does not name an ASR object`);
+      continue;
+    }
+    const source = sourceRecords.get(entry.source);
+    if (!source) {
+      errors.push(`${entry.pointer}: source is absent from inventory`);
+      continue;
+    }
+    if (!Number.isInteger(entry.start) || !Number.isInteger(entry.end) ||
+        entry.start < 0 || entry.start > entry.end || entry.end > source.byte_length) {
+      errors.push(`${entry.pointer}: invalid source byte range`);
+      continue;
+    }
+    const boundaries = boundarySets.get(entry.source);
+    if (!boundaries?.has(entry.start) || !boundaries?.has(entry.end)) {
+      errors.push(`${entry.pointer}: source range splits a UTF-8 scalar`);
+    }
+    if (entry.origin === "source" && entry.start === entry.end) {
+      errors.push(`${entry.pointer}: source-origin range is empty`);
+    } else if (entry.origin === "synthetic" && entry.start !== entry.end) {
+      errors.push(`${entry.pointer}: synthetic range is not empty`);
+    }
+    if (path[0] === "modules" && Number.isInteger(path[1])) {
+      const moduleSource = asr.modules?.[path[1]]?.source;
+      if (entry.source !== moduleSource) errors.push(`${entry.pointer}: range belongs to the wrong module source`);
+    }
+  }
+
+  for (const entry of sourceMap.entries ?? []) {
+    const path = pathFromPointer(entry.pointer);
+    if (!path) continue;
+    for (let length = path.length - 1; length > 0; length -= 1) {
+      const ancestor = entriesByPointer.get(pointerFromPath(path.slice(0, length)));
+      if (!ancestor) continue;
+      if (ancestor.source !== entry.source || ancestor.start > entry.start || ancestor.end < entry.end) {
+        errors.push(`${entry.pointer}: range escapes its nearest mapped ancestor`);
+      }
+      break;
+    }
+  }
+  return [...new Set(errors)];
+}
+
 function versionAtLeast(actual, minimum) {
   if (actual.length !== minimum.length || actual.some(Number.isNaN) || minimum.some(Number.isNaN)) return false;
   for (let index = 0; index < actual.length; index += 1) {
@@ -351,6 +536,7 @@ function parseWithPython(testCase) {
 }
 
 let sourceParserAgreement = 0;
+let syntaxSourceMapAudits = 0;
 for (const testCase of sourceCases) {
   const nodeResult = parseNode(testCase.source);
   const pythonResult = parseWithPython(testCase);
@@ -360,6 +546,23 @@ for (const testCase of sourceCases) {
     continue;
   }
   sourceParserAgreement += 1;
+  if (nodeResult.status === "accepted") {
+    const sourceMapErrors = auditSyntaxSourceMap(nodeResult, testCase.source);
+    if (sourceMapErrors.length > 0) fail(`${testCase.id}: syntax source-map audit failed: ${sourceMapErrors[0]}`);
+    else syntaxSourceMapAudits += 1;
+    for (const expected of testCase.expect_source_map ?? []) {
+      const actual = nodeResult.source_map?.entries?.find((entry) => stableJson(entry.path) === stableJson(expected.path));
+      if (!actual) {
+        fail(`${testCase.id}: expected syntax source-map path ${stableJson(expected.path)} is absent`);
+        continue;
+      }
+      for (const [field, value] of Object.entries(expected)) {
+        if (stableJson(actual[field]) !== stableJson(value)) {
+          fail(`${testCase.id}: syntax source-map ${stableJson(expected.path)} expected ${field}=${stableJson(value)}`);
+        }
+      }
+    }
+  }
 }
 
 for (const testCase of sourceCorpus?.accept ?? []) {
@@ -434,7 +637,8 @@ for (const token of reservedTokens) {
 
 const coreSchema = readJson(path.join(specRoot, "core/syntax/K0.schema.json"));
 const asrSchema = readJson(path.join(specRoot, "asr/K0.schema.json"));
-for (const [name, schema] of [["Core", coreSchema], ["ASR", asrSchema]]) {
+const asrSourceMapSchema = readJson(path.join(specRoot, "asr/K0.source-map.schema.json"));
+for (const [name, schema] of [["Core", coreSchema], ["ASR", asrSchema], ["ASR source map", asrSourceMapSchema]]) {
   for (const schemaPath of unclosedObjectSchemas(schema)) {
     fail(`${name} schema has an open object boundary at ${schemaPath}`);
   }
@@ -445,6 +649,10 @@ for (const vector of vectors) {
 }
 
 const layerCorpus = readJson(path.join(specRoot, "conformance/layer/K0.json"));
+const schemaLayerProbeCount =
+  (layerCorpus?.asr?.reject?.length ?? 0) +
+  (layerCorpus?.source_map?.reject?.length ?? 0) +
+  (layerCorpus?.core?.reject?.length ?? 0);
 let schemaLayerRejections = 0;
 const layerAsrFixture = layerCorpus?.asr?.fixture;
 const layerAsrFixtureErrors = validateSchema(asrSchema, layerAsrFixture);
@@ -460,6 +668,19 @@ for (const testCase of layerCorpus?.asr?.reject ?? []) {
   const value = applyMutation(layerAsrFixture, testCase.mutation);
   if (validateSchema(asrSchema, value).length === 0) fail(`${testCase.id}: ASR schema accepted later-layer data`);
   else schemaLayerRejections += 1;
+}
+const layerSourceMapFixture = layerCorpus?.source_map?.fixture;
+const layerSourceMapFixtureErrors = validateSchema(asrSourceMapSchema, layerSourceMapFixture);
+if (layerSourceMapFixtureErrors.length > 0) {
+  fail(`layer.source-map.fixture: source-map schema rejected K0 value: ${layerSourceMapFixtureErrors[0]}`);
+}
+for (const testCase of layerCorpus?.source_map?.reject ?? []) {
+  const value = applyMutation(layerSourceMapFixture, testCase.mutation);
+  if (validateSchema(asrSourceMapSchema, value).length === 0) {
+    fail(`${testCase.id}: source-map schema accepted later-layer data`);
+  } else {
+    schemaLayerRejections += 1;
+  }
 }
 for (const testCase of layerCorpus?.core?.reject ?? []) {
   if (validateSchema(coreSchema, testCase.value).length === 0) fail(`${testCase.id}: Core schema accepted later-layer data`);
@@ -501,7 +722,14 @@ const resolutionCases = [
     group.inputs.map((input, index) => ({ ...input, id: `${group.id}.${index}` }))),
 ];
 requireUnique(resolutionCases.map((entry) => entry.id), "resolution conformance ID");
+requireUnique((resolutionCorpus?.asr_mutations ?? []).map((entry) => entry.id), "resolved ASR mutation ID");
+requireUnique((resolutionCorpus?.source_map_mutations ?? []).map((entry) => entry.id), "resolved source-map mutation ID");
 const resolutionIds = new Set(resolutionCases.map((entry) => entry.id));
+for (const group of resolutionCorpus?.equivalent ?? []) {
+  if (!new Set(["equal", "different"]).has(group.source_map_relation)) {
+    fail(`${group.id}: missing source-map equivalence relation`);
+  }
+}
 for (const [ruleId, testIds] of Object.entries(resolutionCorpus?.rule_links ?? {})) {
   if (!indexedRuleIds.has(ruleId)) fail(`resolution rule link references unindexed rule: ${ruleId}`);
   for (const testId of testIds) {
@@ -547,6 +775,8 @@ function resolveWithPython(testCase) {
 let resolutionAgreement = 0;
 let resolvedAsrValidated = 0;
 let resolvedAsrIdentityAudits = 0;
+let resolvedSourceMapsValidated = 0;
+let resolvedSourceMapAudits = 0;
 for (const testCase of resolutionCases) {
   const input = resolutionInput(testCase);
   if (!testCase.expect) {
@@ -585,6 +815,28 @@ for (const testCase of resolutionCases) {
       if (auditErrors.length > 0) fail(`${testCase.id}: resolved ASR identity audit failed: ${auditErrors[0]}`);
       else resolvedAsrIdentityAudits += 1;
     }
+    const sourceMapSchemaErrors = validateSchema(asrSourceMapSchema, nodeResult.source_map);
+    if (sourceMapSchemaErrors.length > 0) {
+      fail(`${testCase.id}: resolved source map failed closed schema: ${sourceMapSchemaErrors[0]}`);
+    } else {
+      resolvedSourceMapsValidated += 1;
+      const sourceMapAuditErrors = auditResolvedSourceMap(nodeResult.asr, nodeResult.source_map, input.sources);
+      if (sourceMapAuditErrors.length > 0) {
+        fail(`${testCase.id}: resolved source-map audit failed: ${sourceMapAuditErrors[0]}`);
+      } else {
+        resolvedSourceMapAudits += 1;
+      }
+    }
+    for (const expected of testCase.expect_source_map ?? []) {
+      const actual = nodeResult.source_map?.entries?.find((entry) => entry.pointer === expected.pointer);
+      if (!actual) {
+        fail(`${testCase.id}: expected source-map pointer ${expected.pointer} is absent`);
+        continue;
+      }
+      for (const [field, value] of Object.entries(expected)) {
+        if (actual[field] !== value) fail(`${testCase.id}: source-map ${expected.pointer} expected ${field}=${value}`);
+      }
+    }
   }
 }
 
@@ -597,6 +849,15 @@ for (const group of resolutionCorpus?.equivalent ?? []) {
   }
   if (new Set(outputs.map((output) => stableJson(output.asr))).size !== 1) {
     fail(`${group.id}: equivalent package inputs produced different resolved ASR`);
+    continue;
+  }
+  const sourceMapCount = new Set(outputs.map((output) => stableJson(output.source_map))).size;
+  if (group.source_map_relation === "equal" && sourceMapCount !== 1) {
+    fail(`${group.id}: source maps differ despite provenance-equivalent inputs`);
+    continue;
+  }
+  if (group.source_map_relation === "different" && sourceMapCount === 1) {
+    fail(`${group.id}: source maps hide distinct source provenance`);
     continue;
   }
   resolutionEquivalence += 1;
@@ -626,6 +887,32 @@ for (const mutation of resolutionCorpus?.asr_mutations ?? []) {
     continue;
   }
   resolvedAsrMutationRejections += 1;
+}
+
+let resolvedSourceMapMutationRejections = 0;
+for (const mutation of resolutionCorpus?.source_map_mutations ?? []) {
+  const fixture = resolutionAcceptById.get(mutation.base);
+  if (!fixture) {
+    fail(`${mutation.id}: source-map mutation has no base fixture ${mutation.base}`);
+    continue;
+  }
+  const input = resolutionInput(fixture);
+  const resolved = resolveNodePackage(input);
+  if (resolved.status !== "accepted") {
+    fail(`${mutation.id}: base fixture did not resolve`);
+    continue;
+  }
+  const mutatedSourceMap = applyMutation(resolved.source_map, mutation);
+  const schemaErrors = validateSchema(asrSourceMapSchema, mutatedSourceMap);
+  if (schemaErrors.length > 0) {
+    fail(`${mutation.id}: source-map mutation was not structurally valid: ${schemaErrors[0]}`);
+    continue;
+  }
+  if (auditResolvedSourceMap(resolved.asr, mutatedSourceMap, input.sources).length === 0) {
+    fail(`${mutation.id}: source-map audit accepted semantic tampering`);
+    continue;
+  }
+  resolvedSourceMapMutationRejections += 1;
 }
 
 for (const decisionFile of allFiles(path.join(specRoot, "decisions")).filter((file) => file.endsWith(".json"))) {
@@ -818,13 +1105,13 @@ const tcRequirementsPresent = [
 
 const checks = [
   { id: "G0-01", status: "PASS", requirement: "content-addressed spec.lock", evidence: `sha256:${lock.root_hash}` },
-  { id: "G0-02", status: "FAIL", requirement: "complete K0 Core grammar and static/dynamic semantics", evidence: `${sourceParserAgreement}/${sourceCases.length} source cases parse and ${resolutionAgreement}/${resolutionCases.length} package cases resolve across independent implementations; field resolution, lowering, and full expression/control-flow semantics remain incomplete` },
+  { id: "G0-02", status: "FAIL", requirement: "complete K0 Core grammar and static/dynamic semantics", evidence: `${sourceParserAgreement}/${sourceCases.length} source cases parse, ${resolutionAgreement}/${resolutionCases.length} package cases resolve, and ${resolvedSourceMapAudits}/${resolvedSourceMapsValidated} resolved source maps audit across independent implementations; field-identity elaboration, lowering, and full expression/control-flow semantics remain incomplete` },
   { id: "G0-03", status: "FAIL", requirement: "complete object/resource state machines", evidence: "move, borrow, allocation, deallocation, and leak subset executes; fields, arrays, calls, joins, and numeric states remain OPEN" },
   { id: "G0-04", status: missingK0Rules.length === 0 && evidenceGapRules.length === 0 && stableRules.length === k0Required.length ? "PASS" : "FAIL", requirement: "every frozen K0 Rule ID linked to conformance evidence", evidence: `${requiredRules.length}/${k0Required.length} K0/MEM rules indexed; ${evidenceBearingRules.length} evidence-bearing; ${evidenceGapRules.length} explicit gaps; ${stableRules.length} marked STABLE` },
   { id: "G0-05", status: executorAgreement === vectors.length ? "PASS" : "FAIL", requirement: "two independent Core executors agree", evidence: `${executorAgreement}/${vectors.length} vectors agree byte-for-structure` },
   { id: "G0-06", status: provedTheorems >= 9 ? "PASS" : "FAIL", requirement: "mechanized metatheory repository", evidence: `Lean 4 v4.24.0 and pinned independent replay are locked; ${provedFragments} theorem fragments are encoded but ${provedTheorems}/9 required full K0 theorems are PROVED` },
   { id: "G0-07", status: "PASS", requirement: "host toolchain and initial TCB recorded", evidence: "Node/Python hosts and Lean proof tool are pinned; no npm, Python, or Lean package dependency" },
-  { id: "G0-08", status: "FAIL", requirement: "K1/K2 unreachable from K0 stable entry", evidence: `${generatedLayerCases.length}/${generatedLayerCases.length} lexical mutations, ${packageBoundaryRejections}/${packageCorpus?.reject?.length ?? 0} package probes, ${schemaLayerRejections}/${(layerCorpus?.asr?.reject?.length ?? 0) + (layerCorpus?.core?.reject?.length ?? 0)} structural smuggling probes, and ${resolvedAsrMutationRejections}/${resolutionCorpus?.asr_mutations?.length ?? 0} identity mutations reject; ${resolvedAsrIdentityAudits} resolved ASRs pass closure audits, but field/lowering reachability remains incomplete` },
+  { id: "G0-08", status: "FAIL", requirement: "K1/K2 unreachable from K0 stable entry", evidence: `${generatedLayerCases.length}/${generatedLayerCases.length} lexical mutations, ${packageBoundaryRejections}/${packageCorpus?.reject?.length ?? 0} package probes, ${schemaLayerRejections}/${schemaLayerProbeCount} structural smuggling probes, ${resolvedAsrMutationRejections}/${resolutionCorpus?.asr_mutations?.length ?? 0} identity mutations, and ${resolvedSourceMapMutationRejections}/${resolutionCorpus?.source_map_mutations?.length ?? 0} source-map mutations reject; field-elaboration/lowering reachability remains incomplete` },
   { id: "G0-09", status: tcRequirementsPresent ? "PASS" : "FAIL", requirement: "K1 computation-universality requirements frozen without expanding K0", evidence: tcRequirementsPresent ? "EXEC-001..008 and TC-001..008 exist in parent PRD" : "required TC rules missing" },
   { id: "G0-10", status: "PASS", requirement: "offline-readable review and OPEN inventory", evidence: `${openMarkers} explicit OPEN markers; report and lock are local files` },
 ];
@@ -844,6 +1131,7 @@ const report = {
     independent_executor_agreements: executorAgreement,
     source_cases: sourceCases.length,
     independent_parser_agreements: sourceParserAgreement,
+    syntax_source_map_audits: syntaxSourceMapAudits,
     raw_source_cases: sourceCorpus?.raw_reject?.length ?? 0,
     raw_source_parser_agreements: rawSourceParserAgreement,
     resolution_cases: resolutionCases.length,
@@ -851,6 +1139,9 @@ const report = {
     resolved_asr_schema_validations: resolvedAsrValidated,
     resolved_asr_identity_audits: resolvedAsrIdentityAudits,
     resolved_asr_identity_mutations_rejected: resolvedAsrMutationRejections,
+    resolved_source_map_schema_validations: resolvedSourceMapsValidated,
+    resolved_source_map_audits: resolvedSourceMapAudits,
+    resolved_source_map_mutations_rejected: resolvedSourceMapMutationRejections,
     resolution_equivalence_groups: resolutionEquivalence,
     reserved_layer_tokens_rejected: rejectedReservedTokens.size,
     generated_layer_mutations_rejected: generatedLayerCases.length,
@@ -885,15 +1176,19 @@ const markdown = `# Aether K0 G0 Report\n\n` +
   `- Conformance vectors: ${vectors.length}\n` +
   `- Independent executor agreements: ${executorAgreement}/${vectors.length}\n` +
   `- Independent parser agreements: ${sourceParserAgreement}/${sourceCases.length}\n` +
+  `- Syntax source-map audits: ${syntaxSourceMapAudits}\n` +
   `- Raw-byte parser agreements: ${rawSourceParserAgreement}/${sourceCorpus?.raw_reject?.length ?? 0}\n` +
   `- Independent resolver agreements: ${resolutionAgreement}/${resolutionCases.length}\n` +
   `- Resolved ASR schema validations: ${resolvedAsrValidated}\n` +
   `- Resolved ASR identity-closure audits: ${resolvedAsrIdentityAudits}\n` +
   `- Resolved ASR identity mutations rejected: ${resolvedAsrMutationRejections}/${resolutionCorpus?.asr_mutations?.length ?? 0}\n` +
+  `- Resolved source-map schema validations: ${resolvedSourceMapsValidated}\n` +
+  `- Resolved source-map audits: ${resolvedSourceMapAudits}\n` +
+  `- Resolved source-map mutations rejected: ${resolvedSourceMapMutationRejections}/${resolutionCorpus?.source_map_mutations?.length ?? 0}\n` +
   `- Resolution equivalence groups: ${resolutionEquivalence}/${resolutionCorpus?.equivalent?.length ?? 0}\n` +
   `- Reserved layer tokens rejected: ${rejectedReservedTokens.size}/${reservedTokens.size}\n` +
   `- Generated layer mutations rejected: ${generatedLayerCases.length}/${generatedLayerCases.length}\n` +
-  `- ASR/Core smuggling probes rejected: ${schemaLayerRejections}/${(layerCorpus?.asr?.reject?.length ?? 0) + (layerCorpus?.core?.reject?.length ?? 0)}\n` +
+  `- ASR/source-map/Core smuggling probes rejected: ${schemaLayerRejections}/${schemaLayerProbeCount}\n` +
   `- Package boundary probes rejected: ${packageBoundaryRejections}/${packageCorpus?.reject?.length ?? 0}\n` +
   `- Mechanized theorem fragments: ${provedFragments}\n` +
   `- Mechanized theorems proved: ${provedTheorems}/9\n` +
@@ -915,11 +1210,14 @@ process.stdout.write(`- K0/MEM traceability: ${requiredRules.length}/${k0Require
 process.stdout.write(`- Conformance vectors: ${vectors.length}\n`);
 process.stdout.write(`- Independent executor agreements: ${executorAgreement}/${vectors.length}\n`);
 process.stdout.write(`- Independent parser agreements: ${sourceParserAgreement}/${sourceCases.length}\n`);
+process.stdout.write(`- Syntax source-map audits: ${syntaxSourceMapAudits}\n`);
 process.stdout.write(`- Raw-byte parser agreements: ${rawSourceParserAgreement}/${sourceCorpus?.raw_reject?.length ?? 0}\n`);
 process.stdout.write(`- Independent resolver agreements: ${resolutionAgreement}/${resolutionCases.length}\n`);
 process.stdout.write(`- Resolved ASR schema validations: ${resolvedAsrValidated}\n`);
 process.stdout.write(`- Resolved ASR identity-closure audits: ${resolvedAsrIdentityAudits}\n`);
 process.stdout.write(`- Resolved ASR identity mutations rejected: ${resolvedAsrMutationRejections}/${resolutionCorpus?.asr_mutations?.length ?? 0}\n`);
+process.stdout.write(`- Resolved source-map audits: ${resolvedSourceMapAudits}/${resolvedSourceMapsValidated}\n`);
+process.stdout.write(`- Resolved source-map mutations rejected: ${resolvedSourceMapMutationRejections}/${resolutionCorpus?.source_map_mutations?.length ?? 0}\n`);
 process.stdout.write(`- Layer boundary probes: ${generatedLayerCases.length + schemaLayerRejections + packageBoundaryRejections}/${generatedLayerCases.length + schemaLayerRejections + packageBoundaryRejections}\n`);
 process.stdout.write(`- Mechanized proof fragments: ${provedFragments}\n`);
 process.stdout.write(`- spec.lock root: sha256:${lock.root_hash}\n`);

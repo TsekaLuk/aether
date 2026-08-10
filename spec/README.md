@@ -8,6 +8,7 @@ Key entry points:
 
 - `constitution/K0.md`: invariant boundary.
 - `grammar/K0.ebnf`: draft K0 surface grammar.
+- `asr/`: resolved semantic ASR and orthogonal source-provenance contracts.
 - `core/`: static, dynamic, memory, numeric, error, and transition schemas.
 - `rules/K0.json`: complete K0/MEM traceability index, including explicit gaps.
 - `conformance/`: semantic, source, package, resolution, layer, historical, and

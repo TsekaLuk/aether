@@ -32,6 +32,24 @@
     "K0-HOST-003": [
       "resolve.target-brand-and-host-primitive",
       "resolve.brand-not-found"
+    ],
+    "PIPE-002": [
+      "resolve.manifest-map-order.0",
+      "resolve.manifest-map-order.1",
+      "resolve.trivia-and-integer-normalization.0",
+      "resolve.trivia-and-integer-normalization.1"
+    ],
+    "PIPE-006": [
+      "resolve.utf8-byte-provenance"
+    ],
+    "PIPE-009": [
+      "resolve.utf8-byte-provenance",
+      "resolve.trivia-and-integer-normalization.0",
+      "resolve.trivia-and-integer-normalization.1"
+    ],
+    "PIPE-010": [
+      "resolve.trivia-and-integer-normalization.0",
+      "resolve.trivia-and-integer-normalization.1"
     ]
   },
   "accept": [
@@ -104,11 +122,25 @@
         "src/choice-module.ae": "module Choice; fn None() -> u64 { 1 }",
         "src/main.ae": "module main; enum Choice { None, } fn main() { Choice::None; }"
       }
+    },
+    {
+      "id": "resolve.utf8-byte-provenance",
+      "package_id": "byte-provenance",
+      "entry": "bytes::main",
+      "modules": { "bytes": "src/bytes.ae" },
+      "sources": {
+        "src/bytes.ae": "/* \u91cf */ module bytes; fn main() -> u64 { 1 }"
+      },
+      "expect_source_map": [
+        { "pointer": "/modules/0", "source": "src/bytes.ae", "start": 10, "origin": "source" },
+        { "pointer": "/modules/0/items/0", "source": "src/bytes.ae", "start": 24, "origin": "source" }
+      ]
     }
   ],
   "equivalent": [
     {
       "id": "resolve.manifest-map-order",
+      "source_map_relation": "equal",
       "inputs": [
         {
           "package_id": "order",
@@ -132,6 +164,7 @@
     },
     {
       "id": "resolve.trivia-and-integer-normalization",
+      "source_map_relation": "different",
       "inputs": [
         {
           "package_id": "normalize",
@@ -184,6 +217,50 @@
       "base": "resolve.target-brand-and-host-primitive",
       "path": ["modules", 0, "items", 0, "params", 0, "type", "element", "brand"],
       "value": "brand:heap.absent"
+    }
+  ],
+  "source_map_mutations": [
+    {
+      "id": "source-map.asr-hash-tamper",
+      "base": "resolve.forward-and-recursive",
+      "path": ["asr_hash"],
+      "value": "sha256:0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    {
+      "id": "source-map.source-hash-tamper",
+      "base": "resolve.forward-and-recursive",
+      "path": ["sources", 0, "sha256"],
+      "value": "sha256:0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    {
+      "id": "source-map.dangling-pointer",
+      "base": "resolve.forward-and-recursive",
+      "path": ["entries", 0, "pointer"],
+      "value": "/modules/999"
+    },
+    {
+      "id": "source-map.range-out-of-bounds",
+      "base": "resolve.forward-and-recursive",
+      "path": ["entries", 0, "end"],
+      "value": 999999
+    },
+    {
+      "id": "source-map.cross-source-remap",
+      "base": "resolve.cross-module-and-variants",
+      "path": ["entries", 0, "source"],
+      "value": "src/data.ae"
+    },
+    {
+      "id": "source-map.duplicate-pointer",
+      "base": "resolve.forward-and-recursive",
+      "path": ["entries", 1, "pointer"],
+      "value": "/modules/0"
+    },
+    {
+      "id": "source-map.nonempty-source-span-required",
+      "base": "resolve.utf8-byte-provenance",
+      "path": ["entries", 0, "end"],
+      "value": 10
     }
   ],
   "reject": [

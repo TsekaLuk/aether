@@ -24,6 +24,13 @@
 - Kept generated Python bytecode outside the content-addressed specification by
   disabling resolver bytecode writes and excluding cache artifacts from lock
   traversal.
+- Proposed orthogonal exact-byte source provenance through LCP-0003/draft
+  LDR-0007, preserving trivia-independent semantic ASR and contract hashes.
+- Added independent syntax and resolved source maps: 7 syntax maps and 12
+  resolved maps pass hash, UTF-8 boundary, JSON Pointer, coverage, origin,
+  ownership, ordering, and containment audits; 7 semantic mutations reject.
+- Added PIPE-002/006/009/010 traceability evidence and a closed source-map layer
+  boundary without claiming field elaboration or Core provenance.
 - Indexed all 69 K0/MEM rules; 26 now carry executable evidence and 43 preserve
   explicit evidence gaps.
 - Selected replay-compatible Lean 4.24.0 through LDR-0005 and checked four
