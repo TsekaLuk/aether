@@ -28,7 +28,8 @@ Work is ordered by semantic dependency, not implementation convenience.
 
 ## 4. G0-06: mechanize metatheory
 
-- Done: Lean 4.32.2 is locked through LDR-0005 with leanchecker/nanoda replay.
+- Done: replay-compatible Lean 4.24.0 is locked through LDR-0005 with pinned
+  lean4checker/nanoda replay.
 - Done: a resource-transition fragment proves local determinism and explicit
   alloc/dealloc state changes without placeholders.
 - Encode the Core syntax and transition relation.

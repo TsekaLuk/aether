@@ -1,7 +1,7 @@
 {
   "schema": "aether.g0-report/0.4",
   "status": "FAIL",
-  "spec_lock_hash": "sha256:c22b80ffd22a03f01fd95df63f4d684f84f19abd452929260813e76ac82054b2",
+  "spec_lock_hash": "sha256:88f11e7094c6dab5dee131b9c8e7f038d093f093276e631cfddfdc8c041eddf0",
   "metrics": {
     "parent_prd_rules": 380,
     "indexed_k0_rules": 69,
@@ -28,7 +28,7 @@
       "id": "G0-01",
       "status": "PASS",
       "requirement": "content-addressed spec.lock",
-      "evidence": "sha256:c22b80ffd22a03f01fd95df63f4d684f84f19abd452929260813e76ac82054b2"
+      "evidence": "sha256:88f11e7094c6dab5dee131b9c8e7f038d093f093276e631cfddfdc8c041eddf0"
     },
     {
       "id": "G0-02",
@@ -58,7 +58,7 @@
       "id": "G0-06",
       "status": "FAIL",
       "requirement": "mechanized metatheory repository",
-      "evidence": "Lean 4 v4.32.2 and independent replay are locked; 4 theorem fragments are encoded but 0/9 required full K0 theorems are PROVED"
+      "evidence": "Lean 4 v4.24.0 and pinned independent replay are locked; 4 theorem fragments are encoded but 0/9 required full K0 theorems are PROVED"
     },
     {
       "id": "G0-07",

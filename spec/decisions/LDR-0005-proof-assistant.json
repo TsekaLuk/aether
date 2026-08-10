@@ -4,7 +4,7 @@
   "title": "Lean 4 is the K0 mechanized metatheory checker",
   "status": "PROVISIONAL",
   "basis": "G0-06, PRD section 32.9, and proof/TCB.md",
-  "decision": "Use Lean 4 v4.32.2 without third-party packages for K0 metatheory. Lock the release commit and artifact hashes, build every proof in CI, forbid sorryAx, and replay declarations through leanchecker and nanoda. Proofs do not establish conformance until the encoding relation to the normative K0 spec is reviewed.",
+  "decision": "Use Lean 4 v4.24.0 without third-party Lean packages for K0 metatheory. This version is selected over newer Lean releases because the pinned independent nanoda checker can replay its export format. Lock the Lean release, exporter, and checker commits; build every proof in CI; forbid sorryAx; and replay declarations through lean4checker and nanoda. Proofs do not establish conformance until the encoding relation to the normative K0 spec is reviewed.",
   "dissent": [
     "Lean's implementation and release binaries enlarge the initial trusted base.",
     "Rocq has a longer history of independently checked programming-language metatheory.",
@@ -17,7 +17,7 @@
     "proof": "Future K0 theorem artifacts use Lean declarations and proof terms.",
     "abi": "No impact.",
     "artifact": "Proof tool identity and checked declarations enter spec.lock.",
-    "tooling": "CI and offline replay require the pinned Lean toolchain."
+    "tooling": "CI and archival replay require pinned Lean and Rust toolchains plus mirrored checker and crate sources."
   },
   "supersedes": [],
   "rules": [

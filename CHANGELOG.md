@@ -16,5 +16,6 @@
 - Added 55 generated reserved-token mutations and 8 closed-schema smuggling
   probes plus 6 package-manifest probes for the K0 layer boundary.
 - Indexed all 69 K0/MEM rules while preserving 50 explicit evidence gaps.
-- Selected Lean 4.32.2 through LDR-0005 and checked four allocation-cell theorem
-  fragments without proof placeholders.
+- Selected replay-compatible Lean 4.24.0 through LDR-0005 and checked four
+  allocation-cell theorem fragments without proof placeholders; pinned the
+  independent checker sources and Rust build toolchain.

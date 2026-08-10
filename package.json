@@ -12,7 +12,7 @@
   "scripts": {
     "test": "node tools/validate-spec.mjs",
     "spec:check": "node tools/validate-spec.mjs",
-    "proof:check": "lake build && lake env leanchecker"
+    "proof:check": "lake build && bash tools/check-lean4checker.sh && bash tools/check-nanoda.sh"
   },
   "engines": {
     "node": "26.4.0",

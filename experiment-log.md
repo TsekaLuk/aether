@@ -25,9 +25,10 @@
 - Rejected 55 generated reserved-token placements and 8 structured ASR/Core
   smuggling probes, plus 6 forbidden package manifests; kept G0-08 failed because
   resolved-ASR reachability is not yet proved.
-- Locked Lean 4.32.2 at upstream commit `f3b06c7...`, built the allocation-cell
-  model, and replayed it with `leanchecker`. Four results remain
-  `PROVED_FRAGMENT`; no full K0 theorem was promoted.
+- Locked replay-compatible Lean 4.24.0 at upstream commit `797c613...`, built
+  the allocation-cell model, and replayed 44,846 declarations with pinned
+  `lean4checker` and Nanoda chains. Four results remain `PROVED_FRAGMENT`; no
+  full K0 theorem was promoted.
 
 ## Reuse path
 

@@ -4,18 +4,20 @@ Status: `EXPERIMENTAL`
 
 ## Selected checker
 
-LDR-0005 selects Lean 4 `v4.32.2` at commit
-`f3b06c705e6c85f5314019d5d3baab0fec5b580c`. The repository toolchain spelling
-is `leanprover/lean4:v4.32.2`. The release was published on 2026-07-28.
+LDR-0005 selects Lean 4 `v4.24.0` at commit
+`797c613eb9b6d4ec95db23e3e00af9ac6657f24b`. The repository toolchain spelling
+is `leanprover/lean4:v4.24.0`. The release was published on 2025-10-14. This
+version is deliberately older than the latest Lean release: it is the newest
+line for which the selected independent nanoda checker is replay-compatible.
 
 The official release artifacts used by supported CI/development hosts are:
 
 | Artifact | SHA-256 |
 |---|---|
-| `lean-4.32.2-linux.tar.zst` | `5f2069e6f5db73780f374ccb49ce8ea649aa20a0cebf0116816744c999ce72aa` |
-| `lean-4.32.2-linux_aarch64.tar.zst` | `79aee7ec90f721757d43f75d75fe2e659ded07f0b4e5f1569e92ac9a183e3f81` |
-| `lean-4.32.2-darwin.tar.zst` | `2ce646cca9cab59886303a74a12e3a53065f851baac7dc8672782cc0c2d3b408` |
-| `lean-4.32.2-darwin_aarch64.tar.zst` | `ea99ead969901b9fe4c7e7bf350b812a0249e9a5cea20474a737c0cc64746bc0` |
+| `lean-4.24.0-linux.tar.zst` | `b14f5e5159219dd1a1956c3b806813319f5e94ccd5bdfd56f54520609a5bb5ec` |
+| `lean-4.24.0-linux_aarch64.tar.zst` | `237f8ef43fb40d16681871fb04b2c56f023afc02a5a3877831d35dd493823c23` |
+| `lean-4.24.0-darwin.tar.zst` | `a5ef0fb0e14645eaa0e60bc6ba39a07e7deeeec73dc93ce7195b837eb9de2c9f` |
+| `lean-4.24.0-darwin_aarch64.tar.zst` | `17ee554702c199fc03f37b1c3708245671c93f5d932dcff55a03fa6cdb5e5adf` |
 
 These hashes authenticate distribution bytes; they are not proofs that the
 binary implements Lean correctly.
@@ -38,13 +40,30 @@ alone. Every theorem must link to Rule IDs and a reviewed encoding relation.
 Pull-request CI performs three checks:
 
 - `lake build` with the locked Lean toolchain;
-- Lean's bundled `leanchecker` environment checker;
-- the independent Rust checker `nanoda`, with `sorryAx` forbidden.
+- `lean4checker` at commit `da26eb05e9959402afcb9bd6dfe5dc4f700f70d6`;
+- `ammkrn/lean4export`'s `format2024` protocol line at commit
+  `eb023e55e0852a9bf9b569ecefc42d54338b0c8f`;
+- the independent Rust checker `nanoda` at commit
+  `e5438ac0a85a036b6dfe093aa457bc3448498014`, with `sorryAx` forbidden.
 
-The repository admits no external Lean package dependency. After the pinned Lean
-toolchain is present in a local artifact cache, `lake build` requires no network.
-For long-term archival, the toolchain artifact and its release hash must travel
-with the replay bundle; GitHub Actions cache is convenience, not archival proof.
+Nanoda is built with Rust `1.85.0` at commit
+`4d91de4e48198da2e33413efdcd9cd2cc0c46688` and Cargo `1.85.0` at commit
+`d73d2caf9e41a39daf2a8d6ce60ec80bf354d2a7`. Cargo runs with `--locked`;
+the upstream `Cargo.lock` fixes transitive versions and crate checksums.
+
+The official `leanprover/lean4export` stream is not interchangeable with the
+`format2024` protocol consumed by this Nanoda version. The replay script pins
+the compatible fork and commit explicitly. Nanoda is configured to skip an
+unreferenced `sorryAx` declaration from Lean's prelude but to fail if any
+checked declaration depends on it; the source validator separately rejects
+`sorry`, `admit`, and `axiom` in Aether proof files.
+
+The repository admits no external Lean package dependency. `lake build` requires
+no network once the Lean toolchain is cached. Full independent replay also needs
+the pinned checker source trees and checksum-locked Cargo crates; its first run
+therefore uses the network unless those artifacts are already mirrored. For
+long-term archival, all toolchain, source, and crate artifacts must travel with
+the replay bundle; GitHub Actions cache is convenience, not archival proof.
 
 ## Current proof boundary
 

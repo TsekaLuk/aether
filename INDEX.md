@@ -31,7 +31,7 @@ Completed G0 prerequisites:
 - Dual source-parser agreement and lexical layer rejection corpus.
 - Closed ASR/Core object schemas with structured smuggling probes.
 - Full 69-rule traceability index with explicit gaps.
-- Lean 4.32.2 selection and independently replayable proof fragment.
+- Lean 4.24.0 selection and independently replayable proof fragment.
 
 Links:
 
@@ -40,8 +40,8 @@ Links:
 
 Maintenance:
 
-- Run `npm test` after every normative or executable change; run `lake build` and
-  `lake env leanchecker` after proof changes.
+- Run `npm test` after every normative or executable change; run
+  `npm run proof:check` after proof or proof-toolchain changes.
 - Update this index when meaningful files or project status change.
 - Promote durable implementation code to `workspace/code/` only after G0 passes.
 - Last reviewed: 2026-08-10.

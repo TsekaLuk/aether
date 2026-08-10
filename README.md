@@ -54,10 +54,11 @@ Prerequisites are locked in `spec/manifests/toolchain.json`:
 
 - Node.js `26.4.0`
 - Python `3.9.x` at or above `3.9.6` (`3.9.25` in CI)
-- Lean `4.32.2` for mechanized proof checks
+- Lean `4.24.0` for replay-compatible mechanized proof checks
+- Rust/Cargo `1.85.0` to build the independent Nanoda checker
 - no external npm or Python packages
 - no external Lean packages
-- no network access after the pinned toolchains are present
+- specification validation is offline after host toolchains are present
 
 ```sh
 npm test
@@ -72,12 +73,13 @@ still makes the command fail.
 Proof fragments use a separate locked toolchain:
 
 ```sh
-lake build
-lake env leanchecker
+npm run proof:check
 ```
 
-CI additionally replays declarations with the independent Rust checker `nanoda`
-and rejects `sorryAx`.
+This builds the proof fragment, replays it with pinned `lean4checker`, exports it
+with pinned `lean4export`, and replays the export with the independent Rust
+checker `nanoda`, rejecting `sorryAx`. The first run requires network access to
+fetch the source trees and Cargo crates at their locked commits and checksums.
 
 ## Design discipline
 

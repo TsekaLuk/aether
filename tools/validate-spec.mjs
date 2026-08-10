@@ -384,9 +384,41 @@ if (!pythonEntry || pythonEntry.version_family !== pythonFamily || !pythonAtLeas
 const proofTool = toolchain?.mechanized_proof_tool;
 const leanToolchainPath = path.join(packageRoot, "lean-toolchain");
 const leanToolchain = fs.existsSync(leanToolchainPath) ? fs.readFileSync(leanToolchainPath, "utf8").trim() : "";
-if (!proofTool || proofTool.name !== "Lean 4" || proofTool.version !== "4.32.2" ||
+if (!proofTool || proofTool.name !== "Lean 4" || proofTool.version !== "4.24.0" ||
     proofTool.toolchain !== leanToolchain || proofTool.sorry_allowed !== false) {
   fail("mechanized proof tool lock differs from lean-toolchain or required trust policy");
+}
+const rustBuildTool = proofTool?.rust_build_tool;
+if (!rustBuildTool || rustBuildTool.rustc_version !== "1.85.0" ||
+    rustBuildTool.rustc_source_commit !== "4d91de4e48198da2e33413efdcd9cd2cc0c46688" ||
+    rustBuildTool.cargo_version !== "1.85.0" ||
+    rustBuildTool.cargo_source_commit !== "d73d2caf9e41a39daf2a8d6ce60ec80bf354d2a7" ||
+    rustBuildTool.build_flag !== "--locked") {
+  fail("Nanoda Rust build tool differs from the trust policy");
+}
+const requiredCheckerCommits = new Map([
+  ["lean4checker", "da26eb05e9959402afcb9bd6dfe5dc4f700f70d6"],
+  ["lean4export-format2024", "eb023e55e0852a9bf9b569ecefc42d54338b0c8f"],
+  ["nanoda", "e5438ac0a85a036b6dfe093aa457bc3448498014"],
+]);
+const checkerEntries = proofTool?.independent_checkers ?? [];
+if (checkerEntries.length !== requiredCheckerCommits.size) {
+  fail("mechanized proof checker lock has missing or additional entries");
+}
+const checkerScripts = ["tools/check-lean4checker.sh", "tools/check-nanoda.sh"]
+  .map((file) => fs.readFileSync(path.join(packageRoot, file), "utf8"))
+  .join("\n");
+for (const [name, sourceCommit] of requiredCheckerCommits) {
+  const checker = checkerEntries.find((entry) => entry.name === name);
+  if (!checker || checker.source_commit !== sourceCommit) {
+    fail(`${name}: independent checker commit differs from the trust policy`);
+  }
+  if (!checkerScripts.includes(sourceCommit)) {
+    fail(`${name}: locked commit is not used by an independent replay script`);
+  }
+}
+if (!checkerScripts.includes('rust_toolchain="1.85.0"') || !checkerScripts.includes("--locked")) {
+  fail("Nanoda replay script does not use the locked Rust build policy");
 }
 const leanProofFiles = allFiles(path.join(specRoot, "proof/mechanized")).filter((file) => file.endsWith(".lean"));
 if (leanProofFiles.length === 0) fail("mechanized proof directory contains no Lean files");
@@ -486,7 +518,7 @@ const checks = [
   { id: "G0-03", status: "FAIL", requirement: "complete object/resource state machines", evidence: "move, borrow, allocation, deallocation, and leak subset executes; fields, arrays, calls, joins, and numeric states remain OPEN" },
   { id: "G0-04", status: missingK0Rules.length === 0 && evidenceGapRules.length === 0 && stableRules.length === k0Required.length ? "PASS" : "FAIL", requirement: "every frozen K0 Rule ID linked to conformance evidence", evidence: `${requiredRules.length}/${k0Required.length} K0/MEM rules indexed; ${evidenceBearingRules.length} evidence-bearing; ${evidenceGapRules.length} explicit gaps; ${stableRules.length} marked STABLE` },
   { id: "G0-05", status: executorAgreement === vectors.length ? "PASS" : "FAIL", requirement: "two independent Core executors agree", evidence: `${executorAgreement}/${vectors.length} vectors agree byte-for-structure` },
-  { id: "G0-06", status: provedTheorems >= 9 ? "PASS" : "FAIL", requirement: "mechanized metatheory repository", evidence: `Lean 4 v4.32.2 and independent replay are locked; ${provedFragments} theorem fragments are encoded but ${provedTheorems}/9 required full K0 theorems are PROVED` },
+  { id: "G0-06", status: provedTheorems >= 9 ? "PASS" : "FAIL", requirement: "mechanized metatheory repository", evidence: `Lean 4 v4.24.0 and pinned independent replay are locked; ${provedFragments} theorem fragments are encoded but ${provedTheorems}/9 required full K0 theorems are PROVED` },
   { id: "G0-07", status: "PASS", requirement: "host toolchain and initial TCB recorded", evidence: "Node/Python hosts and Lean proof tool are pinned; no npm, Python, or Lean package dependency" },
   { id: "G0-08", status: "FAIL", requirement: "K1/K2 unreachable from K0 stable entry", evidence: `${generatedLayerCases.length}/${generatedLayerCases.length} lexical mutations, ${packageBoundaryRejections}/${packageCorpus?.reject?.length ?? 0} package probes, and ${schemaLayerRejections}/${(layerCorpus?.asr?.reject?.length ?? 0) + (layerCorpus?.core?.reject?.length ?? 0)} ASR/Core smuggling probes reject; resolved-ASR reachability proof remains incomplete` },
   { id: "G0-09", status: tcRequirementsPresent ? "PASS" : "FAIL", requirement: "K1 computation-universality requirements frozen without expanding K0", evidence: tcRequirementsPresent ? "EXEC-001..008 and TC-001..008 exist in parent PRD" : "required TC rules missing" },
