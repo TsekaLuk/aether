@@ -9,8 +9,12 @@ Work is ordered by semantic dependency, not implementation convenience.
 - Define deterministic surface-to-Core lowering.
 - Complete static judgments and small-step transitions.
 - Done: independent Node/Python source parsers agree on the current grammar.
-- Next: complete package name resolution, canonical ASR, and deterministic
-  surface-to-Core lowering.
+- Done: independent Node/Python package resolvers agree on deterministic name,
+  scope, visibility, lifetime, contract, target-brand, and entry resolution.
+- Done: accepted resolver output passes a closed ASR schema and recomputed
+  identity/reference-closure audit.
+- Next: add source byte spans and statically resolved field identities, then
+  define deterministic resolved-ASR-to-Core lowering.
 
 ## 2. G0-03: complete object/resource states
 
@@ -21,7 +25,7 @@ Work is ordered by semantic dependency, not implementation convenience.
 
 ## 3. G0-04: complete Rule ID coverage
 
-- Done: all 69 K0/MEM rules are indexed; 50 explicit evidence gaps remain.
+- Done: all 69 K0/MEM rules are indexed; 43 explicit evidence gaps remain.
 - Bind each applicable rule to accept, reject, observe, and boundary evidence.
 - Add metamorphic and generated-property corpora.
 - Promote nothing to `STABLE` until semantic OPEN items are zero.
@@ -41,6 +45,8 @@ Work is ordered by semantic dependency, not implementation convenience.
 
 - Done for the current structural boundary: reserved tokens and ASR/Core schema
   smuggling probes reject.
+- Done for the current resolved-ASR identity boundary: entry, symbol, local,
+  lifetime, contract, target-brand, and host-primitive tampering rejects.
 - Prove later-layer nodes are unreachable from a K0 source/package manifest.
 - Add mutation tests that attempt to smuggle effects, capabilities, concurrency,
   user `unsafe`, and FFI into K0 artifacts.

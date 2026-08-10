@@ -1,0 +1,416 @@
+{
+  "schema": "aether.resolution-conformance/k0-0.4",
+  "target": "k0-reference-64",
+  "rule_links": {
+    "K0-EXEC-003": [
+      "resolve.forward-and-recursive",
+      "resolve.cross-module-and-variants",
+      "resolve.inaccessible"
+    ],
+    "K0-EXEC-004": [
+      "resolve.lifetimes-contracts-and-constants",
+      "resolve.trivia-and-integer-normalization.0",
+      "resolve.trivia-and-integer-normalization.1"
+    ],
+    "K0-TYPE-005": [
+      "resolve.cross-module-and-variants",
+      "resolve.wrong-kind"
+    ],
+    "K0-BORROW-005": [
+      "resolve.lifetimes-contracts-and-constants",
+      "resolve.public-lifetime-unlabelled",
+      "resolve.public-lifetime-ambiguous"
+    ],
+    "K0-CONTRACT-002": [
+      "resolve.lifetimes-contracts-and-constants",
+      "resolve.duplicate-contract"
+    ],
+    "K0-CONTRACT-005": [
+      "resolve.result-in-requires",
+      "resolve.contract-function-reference"
+    ],
+    "K0-HOST-003": [
+      "resolve.target-brand-and-host-primitive",
+      "resolve.brand-not-found"
+    ]
+  },
+  "accept": [
+    {
+      "id": "resolve.forward-and-recursive",
+      "package_id": "forward",
+      "entry": "main::main",
+      "modules": { "main": "src/main.ae" },
+      "sources": {
+        "src/main.ae": "module main; fn main() -> u64 { helper(1) } fn helper(n: u64) -> u64 { if n == 0 { 0 } else { helper(n - 1) } }"
+      }
+    },
+    {
+      "id": "resolve.cross-module-and-variants",
+      "package_id": "cross-module",
+      "entry": "app::use",
+      "modules": {
+        "math": "src/math.ae",
+        "app": "src/app.ae",
+        "data": "src/data.ae"
+      },
+      "sources": {
+        "src/data.ae": "module data; pub struct Pair { pub left: u64, pub right: u64, invariant data.pair.ordered: left <= right; } pub enum Choice { None, One(u64), Pair { left: u64, right: u64, }, }",
+        "src/math.ae": "module math; pub fn inc(x: u64) -> u64 { x + 1 }",
+        "src/app.ae": "module app; fn use(value: data::Pair, choice: data::Choice) -> u64 { let p = init data::Pair { left: value.left, right: value.right, }; math::inc(match choice { data::Choice::None => p.left, data::Choice::One(v) => v, data::Choice::Pair { left: l, right: r, } => l + r, }) }"
+      }
+    },
+    {
+      "id": "resolve.lifetimes-contracts-and-constants",
+      "package_id": "contracts",
+      "entry": "model::first",
+      "modules": { "model": "src/model.ae" },
+      "sources": {
+        "src/model.ae": "module model; pub const LIMIT: u64 = 16; pub struct Pair { pub first: u64, pub second: u64, invariant model.pair.limit: first <= LIMIT; } pub fn first(x: &'source Pair) -> &'source u64 requires model.first.input: x.first <= LIMIT; ensures model.first.output: result == x.first; { &x.first }"
+      }
+    },
+    {
+      "id": "resolve.target-brand-and-host-primitive",
+      "package_id": "target-names",
+      "entry": "main::store",
+      "modules": { "main": "src/main.ae" },
+      "sources": {
+        "src/main.ae": "module main; fn store(allocator: &mut Allocator<heap::main>, value: u64) { alloc(allocator, move value); }"
+      }
+    },
+    {
+      "id": "resolve.disjoint-scopes-and-patterns",
+      "package_id": "scopes",
+      "entry": "main::choose",
+      "modules": { "main": "src/main.ae" },
+      "sources": {
+        "src/main.ae": "module main; enum Choice { None, One(u64), Pair { left: u64, right: u64, }, } fn choose(choice: Choice) -> u64 { { let temp = 1; temp }; let temp = 2; match choice { Choice::None => temp, Choice::One(value) => value, Choice::Pair { left: value, right: other, } => value + other, } }"
+      }
+    },
+    {
+      "id": "resolve.disjoint-type-value-namespaces",
+      "package_id": "namespaces",
+      "entry": "main::read",
+      "modules": { "main": "src/main.ae" },
+      "sources": {
+        "src/main.ae": "module main; struct Token {} const Token: u64 = 1; fn read(value: Token) -> u64 { Token }"
+      }
+    },
+    {
+      "id": "resolve.visible-candidate-wins-over-private-collision",
+      "package_id": "visible-candidate",
+      "entry": "main::main",
+      "modules": { "Choice": "src/choice-module.ae", "main": "src/main.ae" },
+      "sources": {
+        "src/choice-module.ae": "module Choice; fn None() -> u64 { 1 }",
+        "src/main.ae": "module main; enum Choice { None, } fn main() { Choice::None; }"
+      }
+    }
+  ],
+  "equivalent": [
+    {
+      "id": "resolve.manifest-map-order",
+      "inputs": [
+        {
+          "package_id": "order",
+          "entry": "a::main",
+          "modules": { "b": "src/b.ae", "a": "src/a.ae" },
+          "sources": {
+            "src/b.ae": "module b; pub fn value() -> u64 { 1 }",
+            "src/a.ae": "module a; fn main() -> u64 { b::value() }"
+          }
+        },
+        {
+          "package_id": "order",
+          "entry": "a::main",
+          "modules": { "a": "src/a.ae", "b": "src/b.ae" },
+          "sources": {
+            "src/a.ae": "module a; fn main() -> u64 { b::value() }",
+            "src/b.ae": "module b; pub fn value() -> u64 { 1 }"
+          }
+        }
+      ]
+    },
+    {
+      "id": "resolve.trivia-and-integer-normalization",
+      "inputs": [
+        {
+          "package_id": "normalize",
+          "entry": "main::main",
+          "modules": { "main": "src/main.ae" },
+          "sources": { "src/main.ae": "module main; const N: u64 = 16; fn main() -> u64 { N }" }
+        },
+        {
+          "package_id": "normalize",
+          "entry": "main::main",
+          "modules": { "main": "src/main.ae" },
+          "sources": { "src/main.ae": "module main; // normalized\n const N : u64 = 0x10; fn main ( ) -> u64 { N }" }
+        }
+      ]
+    }
+  ],
+  "asr_mutations": [
+    {
+      "id": "asr.dangling-entry",
+      "base": "resolve.forward-and-recursive",
+      "path": ["entry"],
+      "value": "sym:0000000000000000"
+    },
+    {
+      "id": "asr.identity-hash-tamper",
+      "base": "resolve.forward-and-recursive",
+      "path": ["modules", 0, "items", 0, "identity", "id"],
+      "value": "sym:0000000000000000"
+    },
+    {
+      "id": "asr.dangling-symbol-reference",
+      "base": "resolve.forward-and-recursive",
+      "path": ["modules", 0, "items", 0, "body", "tail", "callee", "symbol"],
+      "value": "sym:0000000000000000"
+    },
+    {
+      "id": "asr.contract-expression-hash-tamper",
+      "base": "resolve.lifetimes-contracts-and-constants",
+      "path": ["modules", 0, "items", 1, "invariants", 0, "expression_hash"],
+      "value": "sha256:0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    {
+      "id": "asr.unlisted-host-primitive",
+      "base": "resolve.target-brand-and-host-primitive",
+      "path": ["modules", 0, "items", 0, "body", "statements", 0, "expression", "callee", "primitive"],
+      "value": "primitive:network"
+    },
+    {
+      "id": "asr.unlisted-target-brand",
+      "base": "resolve.target-brand-and-host-primitive",
+      "path": ["modules", 0, "items", 0, "params", 0, "type", "element", "brand"],
+      "value": "brand:heap.absent"
+    }
+  ],
+  "reject": [
+    {
+      "id": "resolve.manifest-malformed",
+      "package_id": "malformed",
+      "entry": "main::main",
+      "modules": null,
+      "sources": {},
+      "expect": { "code": "RESOLVE-MANIFEST-MALFORMED", "module": "<package>", "subject": "modules" }
+    },
+    {
+      "id": "resolve.source-missing",
+      "package_id": "missing",
+      "entry": "main::main",
+      "modules": { "main": "src/main.ae" },
+      "sources": {},
+      "expect": { "code": "RESOLVE-SOURCE-MISSING", "module": "main", "subject": "src/main.ae" }
+    },
+    {
+      "id": "resolve.source-undeclared",
+      "package_id": "extra",
+      "entry": "main::main",
+      "modules": { "main": "src/main.ae" },
+      "sources": {
+        "src/main.ae": "module main; fn main() {}",
+        "src/extra.ae": "module extra; fn hidden() {}"
+      },
+      "expect": { "code": "RESOLVE-SOURCE-UNDECLARED", "module": "<package>", "subject": "src/extra.ae" }
+    },
+    {
+      "id": "resolve.module-mismatch",
+      "package_id": "mismatch",
+      "entry": "main::main",
+      "modules": { "main": "src/main.ae" },
+      "sources": { "src/main.ae": "module other; fn main() {}" },
+      "expect": { "code": "RESOLVE-MODULE-MISMATCH", "module": "main", "subject": "other" }
+    },
+    {
+      "id": "resolve.entry-module-not-found",
+      "package_id": "entry-module-missing",
+      "entry": "ghost::main",
+      "modules": { "main": "src/main.ae" },
+      "sources": { "src/main.ae": "module main; fn main() {}" },
+      "expect": { "code": "RESOLVE-NOT-FOUND", "module": "<package>", "subject": "ghost::main" }
+    },
+    {
+      "id": "resolve.entry-not-found",
+      "package_id": "entry-missing",
+      "entry": "main::start",
+      "modules": { "main": "src/main.ae" },
+      "sources": { "src/main.ae": "module main; fn main() {}" },
+      "expect": { "code": "RESOLVE-NOT-FOUND", "module": "main", "subject": "main::start" }
+    },
+    {
+      "id": "resolve.entry-wrong-kind",
+      "package_id": "entry-kind",
+      "entry": "main::boot",
+      "modules": { "main": "src/main.ae" },
+      "sources": { "src/main.ae": "module main; const boot: u64 = 0;" },
+      "expect": { "code": "RESOLVE-WRONG-KIND", "module": "main", "subject": "main::boot" }
+    },
+    {
+      "id": "resolve.duplicate-type",
+      "package_id": "duplicate-type",
+      "entry": "main::main",
+      "modules": { "main": "src/main.ae" },
+      "sources": { "src/main.ae": "module main; struct Item {} enum Item { None, } fn main() {}" },
+      "expect": { "code": "RESOLVE-DUPLICATE", "module": "main", "subject": "type:Item" }
+    },
+    {
+      "id": "resolve.duplicate-field",
+      "package_id": "duplicate-field",
+      "entry": "main::main",
+      "modules": { "main": "src/main.ae" },
+      "sources": { "src/main.ae": "module main; struct Item { value: u64, value: u64, } fn main() {}" },
+      "expect": { "code": "RESOLVE-DUPLICATE", "module": "main", "subject": "field:Item.value" }
+    },
+    {
+      "id": "resolve.duplicate-variant",
+      "package_id": "duplicate-variant",
+      "entry": "main::main",
+      "modules": { "main": "src/main.ae" },
+      "sources": { "src/main.ae": "module main; enum Item { None, None, } fn main() {}" },
+      "expect": { "code": "RESOLVE-DUPLICATE", "module": "main", "subject": "variant:Item::None" }
+    },
+    {
+      "id": "resolve.duplicate-parameter",
+      "package_id": "duplicate-parameter",
+      "entry": "main::main",
+      "modules": { "main": "src/main.ae" },
+      "sources": { "src/main.ae": "module main; fn main(value: u64, value: u64) {}" },
+      "expect": { "code": "RESOLVE-DUPLICATE", "module": "main", "subject": "parameter:main:value" }
+    },
+    {
+      "id": "resolve.duplicate-contract",
+      "package_id": "duplicate-contract",
+      "entry": "main::main",
+      "modules": { "main": "src/main.ae" },
+      "sources": { "src/main.ae": "module main; fn first() requires same.id: true; {} fn main() ensures same.id: true; {}" },
+      "expect": { "code": "RESOLVE-DUPLICATE", "module": "main", "subject": "contract:same.id" }
+    },
+    {
+      "id": "resolve.not-found-value",
+      "package_id": "not-found",
+      "entry": "main::main",
+      "modules": { "main": "src/main.ae" },
+      "sources": { "src/main.ae": "module main; fn main() { absent; }" },
+      "expect": { "code": "RESOLVE-NOT-FOUND", "module": "main", "subject": "absent" }
+    },
+    {
+      "id": "resolve.wrong-kind",
+      "package_id": "wrong-kind",
+      "entry": "main::main",
+      "modules": { "main": "src/main.ae" },
+      "sources": { "src/main.ae": "module main; struct Item {} fn main() { Item; }" },
+      "expect": { "code": "RESOLVE-WRONG-KIND", "module": "main", "subject": "Item" }
+    },
+    {
+      "id": "resolve.inaccessible",
+      "package_id": "private-name",
+      "entry": "app::main",
+      "modules": { "lib": "src/lib.ae", "app": "src/app.ae" },
+      "sources": {
+        "src/lib.ae": "module lib; fn secret() -> u64 { 1 }",
+        "src/app.ae": "module app; fn main() -> u64 { lib::secret() }"
+      },
+      "expect": { "code": "RESOLVE-INACCESSIBLE", "module": "app", "subject": "lib::secret" }
+    },
+    {
+      "id": "resolve.module-variant-ambiguous",
+      "package_id": "ambiguous",
+      "entry": "main::main",
+      "modules": { "Choice": "src/choice-module.ae", "main": "src/main.ae" },
+      "sources": {
+        "src/choice-module.ae": "module Choice; pub fn None() -> u64 { 1 }",
+        "src/main.ae": "module main; enum Choice { None, } fn main() { Choice::None; }"
+      },
+      "expect": { "code": "RESOLVE-AMBIGUOUS", "module": "main", "subject": "Choice::None" }
+    },
+    {
+      "id": "resolve.active-shadow",
+      "package_id": "shadow",
+      "entry": "main::main",
+      "modules": { "main": "src/main.ae" },
+      "sources": { "src/main.ae": "module main; fn main(value: u64) { let value = 1; }" },
+      "expect": { "code": "RESOLVE-SHADOW", "module": "main", "subject": "value" }
+    },
+    {
+      "id": "resolve.pattern-shadow",
+      "package_id": "pattern-shadow",
+      "entry": "main::main",
+      "modules": { "main": "src/main.ae" },
+      "sources": { "src/main.ae": "module main; enum Item { One(u64), } fn main(value: u64, item: Item) -> u64 { match item { Item::One(value) => value, } }" },
+      "expect": { "code": "RESOLVE-SHADOW", "module": "main", "subject": "value" }
+    },
+    {
+      "id": "resolve.lifetime-outside-signature",
+      "package_id": "lifetime-scope",
+      "entry": "main::main",
+      "modules": { "main": "src/main.ae" },
+      "sources": { "src/main.ae": "module main; struct Bad { value: &'a u64, } fn main() {}" },
+      "expect": { "code": "RESOLVE-LIFETIME-SCOPE", "module": "main", "subject": "a" }
+    },
+    {
+      "id": "resolve.public-lifetime-unlabelled",
+      "package_id": "lifetime-unlabelled",
+      "entry": "main::first",
+      "modules": { "main": "src/main.ae" },
+      "sources": { "src/main.ae": "module main; pub fn first(value: &u64) -> &u64 { value }" },
+      "expect": { "code": "RESOLVE-LIFETIME-ORIGIN", "module": "main", "subject": "first:<unlabelled>" }
+    },
+    {
+      "id": "resolve.public-lifetime-ambiguous",
+      "package_id": "lifetime-ambiguous",
+      "entry": "main::choose",
+      "modules": { "main": "src/main.ae" },
+      "sources": { "src/main.ae": "module main; pub fn choose(left: &'a u64, right: &'a u64) -> &'a u64 { left }" },
+      "expect": { "code": "RESOLVE-LIFETIME-ORIGIN", "module": "main", "subject": "choose:a" }
+    },
+    {
+      "id": "resolve.result-in-requires",
+      "package_id": "contract-scope",
+      "entry": "main::main",
+      "modules": { "main": "src/main.ae" },
+      "sources": { "src/main.ae": "module main; fn main() requires invalid.result: result == 0; {}" },
+      "expect": { "code": "RESOLVE-CONTRACT-SCOPE", "module": "main", "subject": "result" }
+    },
+    {
+      "id": "resolve.contract-function-reference",
+      "package_id": "contract-kind",
+      "entry": "main::main",
+      "modules": { "main": "src/main.ae" },
+      "sources": { "src/main.ae": "module main; fn helper() -> u64 { 1 } fn main() requires invalid.function: helper == 1; {}" },
+      "expect": { "code": "RESOLVE-WRONG-KIND", "module": "main", "subject": "helper" }
+    },
+    {
+      "id": "resolve.brand-not-found",
+      "package_id": "brand-missing",
+      "entry": "main::main",
+      "modules": { "main": "src/main.ae" },
+      "sources": { "src/main.ae": "module main; fn main(allocator: Allocator<heap::absent>) {}" },
+      "expect": { "code": "RESOLVE-BRAND-NOT-FOUND", "module": "main", "subject": "heap::absent" }
+    },
+    {
+      "id": "resolve.constructor-payload-kind",
+      "package_id": "constructor-kind",
+      "entry": "main::main",
+      "modules": { "main": "src/main.ae" },
+      "sources": { "src/main.ae": "module main; enum Item { One(u64), } fn main() { init Item::One { value: 1, }; }" },
+      "expect": { "code": "RESOLVE-WRONG-KIND", "module": "main", "subject": "Item::One" }
+    },
+    {
+      "id": "resolve.reserved-host-primitive-declaration",
+      "package_id": "reserved-primitive",
+      "entry": "main::main",
+      "modules": { "main": "src/main.ae" },
+      "sources": { "src/main.ae": "module main; fn alloc() {} fn main() {}" },
+      "expect": { "code": "RESOLVE-RESERVED-NAME", "module": "main", "subject": "alloc" }
+    },
+    {
+      "id": "resolve.reserved-result-binding",
+      "package_id": "reserved-result",
+      "entry": "main::main",
+      "modules": { "main": "src/main.ae" },
+      "sources": { "src/main.ae": "module main; fn main(result: u64) -> u64 { result }" },
+      "expect": { "code": "RESOLVE-RESERVED-NAME", "module": "main", "subject": "result" }
+    }
+  ]
+}

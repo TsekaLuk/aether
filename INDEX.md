@@ -10,7 +10,7 @@ Inventory:
 - `README.md`: repository overview and current authorization boundary.
 - `docs/prd/`: PRD history; v0.3 is the current parent product contract.
 - `spec/`: v0.4 K0 executable specification package.
-- `tools/`: independent parsers/executors, schema checker, and validator.
+- `tools/`: independent parsers/resolvers/executors, schema checker, and validator.
 - `reports/`: generated G0 evidence.
 - `spec/proof/`: locked Lean TCB, theorem ledger, and mechanized fragments.
 - `docs/roadmap.md`: ordered G0 closure plan.
@@ -29,7 +29,9 @@ Active Items:
 Completed G0 prerequisites:
 
 - Dual source-parser agreement and lexical layer rejection corpus.
-- Closed ASR/Core object schemas with structured smuggling probes.
+- Deterministic package name resolution with independent implementation agreement.
+- Closed resolved-ASR/Core object schemas with identity audits and structured
+  smuggling probes.
 - Full 69-rule traceability index with explicit gaps.
 - Lean 4.24.0 selection and independently replayable proof fragment.
 

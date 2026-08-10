@@ -1,102 +1,679 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://aether.invalid/spec/0.4/asr/K0.schema.json",
-  "title": "Aether K0 Resolved ASR",
+  "title": "Aether K0 resolved ASR",
   "type": "object",
-  "required": ["schema", "language_version", "core_layer", "module", "items"],
+  "required": ["schema", "language_version", "core_layer", "package_id", "target", "entry", "modules"],
   "additionalProperties": false,
   "properties": {
     "schema": { "const": "aether.asr/k0-0.4" },
     "language_version": { "const": "0.4.0-draft" },
     "core_layer": { "const": "K0" },
-    "module": { "type": "string", "pattern": "^[A-Za-z_][A-Za-z0-9_]*(\\.[A-Za-z_][A-Za-z0-9_]*)*$" },
-    "items": {
-      "type": "array",
-      "items": { "$ref": "#/$defs/item" }
-    }
+    "package_id": { "type": "string", "pattern": "^[a-z][a-z0-9.-]{0,62}$" },
+    "target": { "const": "k0-reference-64" },
+    "entry": { "$ref": "#/$defs/symbol_id" },
+    "modules": { "type": "array", "items": { "$ref": "#/$defs/module" } }
   },
   "$defs": {
-    "symbol": {
-      "type": "string",
-      "pattern": "^sym:[a-f0-9]{16,64}$"
+    "identifier": { "type": "string", "pattern": "^[A-Za-z_][A-Za-z0-9_]*$" },
+    "module_path": { "type": "string", "pattern": "^[A-Za-z_][A-Za-z0-9_]*(\\.[A-Za-z_][A-Za-z0-9_]*)*$" },
+    "source_path": { "type": "string", "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))[A-Za-z0-9_./-]+\\.ae$" },
+    "symbol_id": { "type": "string", "pattern": "^sym:[a-f0-9]{16}$" },
+    "local_id": { "type": "string", "pattern": "^local:[a-f0-9]{16}$" },
+    "lifetime_id": { "type": "string", "pattern": "^life:[a-f0-9]{16}$" },
+    "contract_id": { "type": "string", "pattern": "^contract:[a-f0-9]{16}$" },
+    "brand": { "type": "string", "pattern": "^brand:[A-Za-z0-9_.-]+$" },
+    "primitive_id": { "type": "string", "pattern": "^primitive:[A-Za-z_][A-Za-z0-9_]*$" },
+    "visibility": { "enum": ["private", "public"] },
+    "symbol_identity": {
+      "type": "object",
+      "required": ["id", "package", "module", "namespace", "name", "kind"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "$ref": "#/$defs/symbol_id" },
+        "package": { "type": "string", "pattern": "^[a-z][a-z0-9.-]{0,62}$" },
+        "module": { "$ref": "#/$defs/module_path" },
+        "namespace": { "enum": ["type", "value"] },
+        "name": { "type": "string", "pattern": "^[A-Za-z_][A-Za-z0-9_]*(::[A-Za-z_][A-Za-z0-9_]*)?$" },
+        "kind": { "enum": ["const", "struct", "enum", "function", "enum_variant"] }
+      }
+    },
+    "binding": {
+      "type": "object",
+      "required": ["id", "function", "kind", "ordinal", "name"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "$ref": "#/$defs/local_id" },
+        "function": { "$ref": "#/$defs/symbol_id" },
+        "kind": { "enum": ["parameter", "let", "pattern"] },
+        "ordinal": { "type": "integer", "minimum": 0 },
+        "name": { "$ref": "#/$defs/identifier" }
+      }
+    },
+    "lifetime": {
+      "type": "object",
+      "required": ["id", "function", "label"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "$ref": "#/$defs/lifetime_id" },
+        "function": { "$ref": "#/$defs/symbol_id" },
+        "label": { "$ref": "#/$defs/identifier" }
+      }
+    },
+    "contract_identity": {
+      "type": "object",
+      "required": ["id", "package", "module", "owner", "kind", "name"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "$ref": "#/$defs/contract_id" },
+        "package": { "type": "string", "pattern": "^[a-z][a-z0-9.-]{0,62}$" },
+        "module": { "$ref": "#/$defs/module_path" },
+        "owner": { "$ref": "#/$defs/symbol_id" },
+        "kind": { "enum": ["requires", "ensures", "invariant"] },
+        "name": { "type": "string", "pattern": "^[A-Za-z_][A-Za-z0-9_]*(\\.[A-Za-z_][A-Za-z0-9_]*)*$" }
+      }
     },
     "type": {
       "oneOf": [
-        { "enum": ["bool", "unit", "u8", "u16", "u32", "u64", "i8", "i16", "i32", "i64", "usize", "isize"] },
         {
           "type": "object",
-          "required": ["kind", "symbol"],
+          "required": ["kind", "name"],
+          "additionalProperties": false,
           "properties": {
-            "kind": { "const": "nominal" },
-            "symbol": { "$ref": "#/$defs/symbol" }
-          },
-          "additionalProperties": false
+            "kind": { "const": "primitive" },
+            "name": { "enum": ["bool", "unit", "u8", "u16", "u32", "u64", "i8", "i16", "i32", "i64", "usize", "isize"] }
+          }
         },
         {
           "type": "object",
-          "required": ["kind", "element"],
+          "required": ["kind", "symbol"],
+          "additionalProperties": false,
           "properties": {
-            "kind": { "enum": ["shared_ref", "mut_ref", "slice"] },
+            "kind": { "const": "nominal" },
+            "symbol": { "$ref": "#/$defs/symbol_id" }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["kind", "lifetime", "element"],
+          "additionalProperties": false,
+          "properties": {
+            "kind": { "enum": ["shared_ref", "mut_ref"] },
+            "lifetime": {
+              "oneOf": [
+                { "$ref": "#/$defs/lifetime_id" },
+                { "type": "null" }
+              ]
+            },
             "element": { "$ref": "#/$defs/type" }
-          },
-          "additionalProperties": false
+          }
+        },
+        {
+          "type": "object",
+          "required": ["kind", "elements"],
+          "additionalProperties": false,
+          "properties": {
+            "kind": { "const": "tuple" },
+            "elements": { "type": "array", "items": { "$ref": "#/$defs/type" } }
+          }
         },
         {
           "type": "object",
           "required": ["kind", "element", "length"],
+          "additionalProperties": false,
           "properties": {
             "kind": { "const": "array" },
             "element": { "$ref": "#/$defs/type" },
-            "length": { "type": "integer", "minimum": 0 }
-          },
-          "additionalProperties": false
+            "length": { "type": "string", "pattern": "^(0|[1-9][0-9]*)$" }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["kind", "element"],
+          "additionalProperties": false,
+          "properties": {
+            "kind": { "const": "slice" },
+            "element": { "$ref": "#/$defs/type" }
+          }
         },
         {
           "type": "object",
           "required": ["kind", "value", "brand"],
+          "additionalProperties": false,
           "properties": {
             "kind": { "const": "own" },
             "value": { "$ref": "#/$defs/type" },
-            "brand": { "type": "string", "pattern": "^brand:[A-Za-z0-9_.-]+$" }
-          },
-          "additionalProperties": false
+            "brand": { "$ref": "#/$defs/brand" }
+          }
         },
         {
           "type": "object",
           "required": ["kind", "brand"],
+          "additionalProperties": false,
           "properties": {
             "kind": { "const": "allocator" },
-            "brand": { "type": "string", "pattern": "^brand:[A-Za-z0-9_.-]+$" }
-          },
-          "additionalProperties": false
+            "brand": { "$ref": "#/$defs/brand" }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["kind", "ok", "error"],
+          "additionalProperties": false,
+          "properties": {
+            "kind": { "const": "result" },
+            "ok": { "$ref": "#/$defs/type" },
+            "error": { "$ref": "#/$defs/type" }
+          }
+        }
+      ]
+    },
+    "field": {
+      "type": "object",
+      "required": ["name", "visibility", "type"],
+      "additionalProperties": false,
+      "properties": {
+        "name": { "$ref": "#/$defs/identifier" },
+        "visibility": { "$ref": "#/$defs/visibility" },
+        "type": { "$ref": "#/$defs/type" }
+      }
+    },
+    "contract_target": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["kind", "symbol"],
+          "additionalProperties": false,
+          "properties": { "kind": { "const": "symbol" }, "symbol": { "$ref": "#/$defs/symbol_id" } }
+        },
+        {
+          "type": "object",
+          "required": ["kind", "binding"],
+          "additionalProperties": false,
+          "properties": { "kind": { "const": "local" }, "binding": { "$ref": "#/$defs/local_id" } }
+        },
+        {
+          "type": "object",
+          "required": ["kind", "function"],
+          "additionalProperties": false,
+          "properties": { "kind": { "const": "result" }, "function": { "$ref": "#/$defs/symbol_id" } }
+        },
+        {
+          "type": "object",
+          "required": ["kind", "owner", "name"],
+          "additionalProperties": false,
+          "properties": {
+            "kind": { "const": "field" },
+            "owner": { "$ref": "#/$defs/symbol_id" },
+            "name": { "$ref": "#/$defs/identifier" }
+          }
+        }
+      ]
+    },
+    "contract_expression": {
+      "oneOf": [
+        { "$ref": "#/$defs/integer" },
+        { "$ref": "#/$defs/boolean" },
+        {
+          "type": "object",
+          "required": ["kind", "operator", "value"],
+          "additionalProperties": false,
+          "properties": {
+            "kind": { "const": "contract_unary" },
+            "operator": { "enum": ["!", "-"] },
+            "value": { "$ref": "#/$defs/contract_expression" }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["kind", "operator", "left", "right"],
+          "additionalProperties": false,
+          "properties": {
+            "kind": { "const": "contract_binary" },
+            "operator": { "enum": ["||", "&&", "==", "!=", "<", "<=", ">", ">=", "+", "-", "*"] },
+            "left": { "$ref": "#/$defs/contract_expression" },
+            "right": { "$ref": "#/$defs/contract_expression" }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["kind", "target", "fields"],
+          "additionalProperties": false,
+          "properties": {
+            "kind": { "const": "contract_ref" },
+            "target": { "$ref": "#/$defs/contract_target" },
+            "fields": { "type": "array", "items": { "$ref": "#/$defs/identifier" } }
+          }
+        }
+      ]
+    },
+    "contract": {
+      "type": "object",
+      "required": ["identity", "kind", "status", "expression_hash", "expression"],
+      "additionalProperties": false,
+      "properties": {
+        "identity": { "$ref": "#/$defs/contract_identity" },
+        "kind": { "enum": ["requires", "ensures", "invariant"] },
+        "status": { "const": "DECLARED_UNPROVEN" },
+        "expression_hash": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+        "expression": { "$ref": "#/$defs/contract_expression" }
+      }
+    },
+    "integer": {
+      "type": "object",
+      "required": ["kind", "value"],
+      "additionalProperties": false,
+      "properties": {
+        "kind": { "const": "integer" },
+        "value": { "type": "string", "pattern": "^(0|[1-9][0-9]*)$" }
+      }
+    },
+    "boolean": {
+      "type": "object",
+      "required": ["kind", "value"],
+      "additionalProperties": false,
+      "properties": { "kind": { "const": "boolean" }, "value": { "type": "boolean" } }
+    },
+    "expression": {
+      "oneOf": [
+        { "$ref": "#/$defs/integer" },
+        { "$ref": "#/$defs/boolean" },
+        {
+          "type": "object",
+          "required": ["kind", "symbol", "target_kind"],
+          "additionalProperties": false,
+          "properties": {
+            "kind": { "const": "symbol_ref" },
+            "symbol": { "$ref": "#/$defs/symbol_id" },
+            "target_kind": { "enum": ["const", "function", "enum_variant"] }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["kind", "binding"],
+          "additionalProperties": false,
+          "properties": { "kind": { "const": "local_ref" }, "binding": { "$ref": "#/$defs/local_id" } }
+        },
+        {
+          "type": "object",
+          "required": ["kind", "primitive"],
+          "additionalProperties": false,
+          "properties": { "kind": { "const": "primitive_ref" }, "primitive": { "$ref": "#/$defs/primitive_id" } }
+        },
+        {
+          "type": "object",
+          "required": ["kind", "operator", "left", "right"],
+          "additionalProperties": false,
+          "properties": {
+            "kind": { "const": "binary" },
+            "operator": { "enum": ["||", "&&", "==", "!=", "<", "<=", ">", ">=", "+", "-", "*", "/", "%"] },
+            "left": { "$ref": "#/$defs/expression" },
+            "right": { "$ref": "#/$defs/expression" }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["kind", "operator", "value"],
+          "additionalProperties": false,
+          "properties": {
+            "kind": { "const": "unary" },
+            "operator": { "enum": ["!", "-", "move", "*"] },
+            "value": { "$ref": "#/$defs/expression" }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["kind", "mutable", "place"],
+          "additionalProperties": false,
+          "properties": {
+            "kind": { "const": "borrow" },
+            "mutable": { "type": "boolean" },
+            "place": { "$ref": "#/$defs/expression" }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["kind", "callee", "arguments"],
+          "additionalProperties": false,
+          "properties": {
+            "kind": { "const": "call" },
+            "callee": { "$ref": "#/$defs/expression" },
+            "arguments": { "type": "array", "items": { "$ref": "#/$defs/expression" } }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["kind", "base", "field"],
+          "additionalProperties": false,
+          "properties": {
+            "kind": { "const": "field" },
+            "base": { "$ref": "#/$defs/expression" },
+            "field": { "$ref": "#/$defs/identifier" }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["kind", "base", "index"],
+          "additionalProperties": false,
+          "properties": {
+            "kind": { "const": "index" },
+            "base": { "$ref": "#/$defs/expression" },
+            "index": { "$ref": "#/$defs/expression" }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["kind", "elements"],
+          "additionalProperties": false,
+          "properties": {
+            "kind": { "enum": ["tuple", "array"] },
+            "elements": { "type": "array", "items": { "$ref": "#/$defs/expression" } }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["kind", "constructor", "fields"],
+          "additionalProperties": false,
+          "properties": {
+            "kind": { "const": "record" },
+            "constructor": { "$ref": "#/$defs/symbol_id" },
+            "fields": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": ["name", "value"],
+                "additionalProperties": false,
+                "properties": { "name": { "$ref": "#/$defs/identifier" }, "value": { "$ref": "#/$defs/expression" } }
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["kind", "condition", "then", "otherwise"],
+          "additionalProperties": false,
+          "properties": {
+            "kind": { "const": "if" },
+            "condition": { "$ref": "#/$defs/expression" },
+            "then": { "$ref": "#/$defs/block" },
+            "otherwise": {
+              "oneOf": [
+                { "$ref": "#/$defs/expression" },
+                { "type": "null" }
+              ]
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["kind", "value", "arms"],
+          "additionalProperties": false,
+          "properties": {
+            "kind": { "const": "match" },
+            "value": { "$ref": "#/$defs/expression" },
+            "arms": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "object",
+                "required": ["pattern", "expression"],
+                "additionalProperties": false,
+                "properties": {
+                  "pattern": { "$ref": "#/$defs/pattern" },
+                  "expression": { "$ref": "#/$defs/expression" }
+                }
+              }
+            }
+          }
+        },
+        { "$ref": "#/$defs/block" }
+      ]
+    },
+    "pattern": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["kind"],
+          "additionalProperties": false,
+          "properties": { "kind": { "const": "wildcard_pattern" } }
+        },
+        {
+          "type": "object",
+          "required": ["kind", "value"],
+          "additionalProperties": false,
+          "properties": {
+            "kind": { "const": "literal_pattern" },
+            "value": { "oneOf": [{ "$ref": "#/$defs/integer" }, { "$ref": "#/$defs/boolean" }] }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["kind", "binding"],
+          "additionalProperties": false,
+          "properties": { "kind": { "const": "binding_pattern" }, "binding": { "$ref": "#/$defs/binding" } }
+        },
+        {
+          "type": "object",
+          "required": ["kind", "elements"],
+          "additionalProperties": false,
+          "properties": {
+            "kind": { "const": "tuple_pattern" },
+            "elements": { "type": "array", "items": { "$ref": "#/$defs/pattern" } }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["kind", "constructor"],
+          "additionalProperties": false,
+          "properties": { "kind": { "const": "path_pattern" }, "constructor": { "$ref": "#/$defs/symbol_id" } }
+        },
+        {
+          "type": "object",
+          "required": ["kind", "constructor", "elements"],
+          "additionalProperties": false,
+          "properties": {
+            "kind": { "const": "variant_tuple_pattern" },
+            "constructor": { "$ref": "#/$defs/symbol_id" },
+            "elements": { "type": "array", "items": { "$ref": "#/$defs/pattern" } }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["kind", "constructor", "fields"],
+          "additionalProperties": false,
+          "properties": {
+            "kind": { "const": "variant_record_pattern" },
+            "constructor": { "$ref": "#/$defs/symbol_id" },
+            "fields": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": ["name", "pattern"],
+                "additionalProperties": false,
+                "properties": { "name": { "$ref": "#/$defs/identifier" }, "pattern": { "$ref": "#/$defs/pattern" } }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "statement": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["kind", "mutable", "binding", "annotation", "value"],
+          "additionalProperties": false,
+          "properties": {
+            "kind": { "const": "let" },
+            "mutable": { "type": "boolean" },
+            "binding": { "$ref": "#/$defs/binding" },
+            "annotation": { "oneOf": [{ "$ref": "#/$defs/type" }, { "type": "null" }] },
+            "value": { "$ref": "#/$defs/expression" }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["kind", "place", "value"],
+          "additionalProperties": false,
+          "properties": {
+            "kind": { "const": "assign" },
+            "place": { "$ref": "#/$defs/expression" },
+            "value": { "$ref": "#/$defs/expression" }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["kind", "expression"],
+          "additionalProperties": false,
+          "properties": { "kind": { "const": "expression_statement" }, "expression": { "$ref": "#/$defs/expression" } }
+        },
+        {
+          "type": "object",
+          "required": ["kind", "value"],
+          "additionalProperties": false,
+          "properties": {
+            "kind": { "const": "return" },
+            "value": { "oneOf": [{ "$ref": "#/$defs/expression" }, { "type": "null" }] }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["kind", "condition", "body"],
+          "additionalProperties": false,
+          "properties": {
+            "kind": { "const": "while" },
+            "condition": { "$ref": "#/$defs/expression" },
+            "body": { "$ref": "#/$defs/block" }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["kind", "body"],
+          "additionalProperties": false,
+          "properties": { "kind": { "const": "loop" }, "body": { "$ref": "#/$defs/block" } }
+        },
+        {
+          "type": "object",
+          "required": ["kind"],
+          "additionalProperties": false,
+          "properties": { "kind": { "enum": ["break", "continue"] } }
+        }
+      ]
+    },
+    "block": {
+      "type": "object",
+      "required": ["kind", "statements", "tail"],
+      "additionalProperties": false,
+      "properties": {
+        "kind": { "const": "block" },
+        "statements": { "type": "array", "items": { "$ref": "#/$defs/statement" } },
+        "tail": { "oneOf": [{ "$ref": "#/$defs/expression" }, { "type": "null" }] }
+      }
+    },
+    "variant_payload": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["kind"],
+          "additionalProperties": false,
+          "properties": { "kind": { "const": "unit" } }
+        },
+        {
+          "type": "object",
+          "required": ["kind", "types"],
+          "additionalProperties": false,
+          "properties": { "kind": { "const": "tuple" }, "types": { "type": "array", "items": { "$ref": "#/$defs/type" } } }
+        },
+        {
+          "type": "object",
+          "required": ["kind", "fields"],
+          "additionalProperties": false,
+          "properties": { "kind": { "const": "record" }, "fields": { "type": "array", "items": { "$ref": "#/$defs/field" } } }
         }
       ]
     },
     "item": {
-      "type": "object",
-      "required": ["kind", "symbol", "name", "visibility"],
-      "properties": {
-        "kind": { "enum": ["const", "struct", "enum", "function"] },
-        "symbol": { "$ref": "#/$defs/symbol" },
-        "name": { "type": "string", "pattern": "^[A-Za-z_][A-Za-z0-9_]*$" },
-        "visibility": { "enum": ["private", "public"] },
-        "type": { "$ref": "#/$defs/type" },
-        "contracts": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "required": ["id", "kind", "status", "expression_hash"],
-            "properties": {
-              "id": { "type": "string" },
-              "kind": { "enum": ["requires", "ensures", "invariant"] },
-              "status": { "const": "DECLARED_UNPROVEN" },
-              "expression_hash": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" }
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["kind", "identity", "visibility", "type", "value"],
+          "additionalProperties": false,
+          "properties": {
+            "kind": { "const": "const" },
+            "identity": { "$ref": "#/$defs/symbol_identity" },
+            "visibility": { "$ref": "#/$defs/visibility" },
+            "type": { "$ref": "#/$defs/type" },
+            "value": { "$ref": "#/$defs/contract_expression" }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["kind", "identity", "visibility", "fields", "invariants"],
+          "additionalProperties": false,
+          "properties": {
+            "kind": { "const": "struct" },
+            "identity": { "$ref": "#/$defs/symbol_identity" },
+            "visibility": { "$ref": "#/$defs/visibility" },
+            "fields": { "type": "array", "items": { "$ref": "#/$defs/field" } },
+            "invariants": { "type": "array", "items": { "$ref": "#/$defs/contract" } }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["kind", "identity", "visibility", "variants", "invariants"],
+          "additionalProperties": false,
+          "properties": {
+            "kind": { "const": "enum" },
+            "identity": { "$ref": "#/$defs/symbol_identity" },
+            "visibility": { "$ref": "#/$defs/visibility" },
+            "variants": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": ["identity", "payload"],
+                "additionalProperties": false,
+                "properties": {
+                  "identity": { "$ref": "#/$defs/symbol_identity" },
+                  "payload": { "$ref": "#/$defs/variant_payload" }
+                }
+              }
             },
-            "additionalProperties": false
+            "invariants": { "type": "array", "items": { "$ref": "#/$defs/contract" } }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["kind", "identity", "visibility", "lifetimes", "params", "result", "contracts", "body"],
+          "additionalProperties": false,
+          "properties": {
+            "kind": { "const": "function" },
+            "identity": { "$ref": "#/$defs/symbol_identity" },
+            "visibility": { "$ref": "#/$defs/visibility" },
+            "lifetimes": { "type": "array", "items": { "$ref": "#/$defs/lifetime" } },
+            "params": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": ["binding", "type"],
+                "additionalProperties": false,
+                "properties": { "binding": { "$ref": "#/$defs/binding" }, "type": { "$ref": "#/$defs/type" } }
+              }
+            },
+            "result": { "$ref": "#/$defs/type" },
+            "contracts": { "type": "array", "items": { "$ref": "#/$defs/contract" } },
+            "body": { "$ref": "#/$defs/block" }
           }
         }
-      },
-      "additionalProperties": false
+      ]
+    },
+    "module": {
+      "type": "object",
+      "required": ["path", "source", "items"],
+      "additionalProperties": false,
+      "properties": {
+        "path": { "$ref": "#/$defs/module_path" },
+        "source": { "$ref": "#/$defs/source_path" },
+        "items": { "type": "array", "items": { "$ref": "#/$defs/item" } }
+      }
     }
   }
 }

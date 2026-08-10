@@ -22,9 +22,23 @@
   owner approval remain outstanding.
 - Ran 77 source cases and two invalid UTF-8 byte cases through independent Node
   and Python parsers; canonical trees and diagnostics agreed in every case.
-- Rejected 55 generated reserved-token placements and 8 structured ASR/Core
+- Rejected 55 generated reserved-token placements and 9 structured ASR/Core
   smuggling probes, plus 6 forbidden package manifests; kept G0-08 failed because
   resolved-ASR reachability is not yet proved.
+- Implemented proposed LCP-0002 as a draft name-resolution experiment. Independent
+  Node and Python implementations agreed on 38 package inputs, including forward
+  and recursive references, module/variant ambiguity, visibility, scope,
+  lifetime origin, contracts, target names, duplicates, and package entry.
+- Validated 11 resolver outputs against a closed recursive ASR schema and an
+  independently recomputed identity/reference-closure audit. Rejected all 6
+  schema-valid identity tampering mutations. This does not establish field
+  resolution, ASR-to-Core lowering, static semantics, or end-to-end trust.
+- Reclassified seven rule entries from gap-only to evidence-bearing without
+  claiming closure: 26 of 69 K0/MEM rules now have executable evidence and 43
+  still carry explicit evidence gaps.
+- A Python 3.9 CI run exposed generated parser bytecode entering `spec.lock`.
+  Disabled bytecode writes in the resolver and excluded `__pycache__`/`.pyc`
+  artifacts from the lock input boundary; source artifacts remain locked.
 - Locked replay-compatible Lean 4.24.0 at upstream commit `797c613...`, built
   the allocation-cell model, and replayed 44,846 declarations with pinned
   `lean4checker` and Nanoda chains. Four results remain `PROVED_FRAGMENT`; no

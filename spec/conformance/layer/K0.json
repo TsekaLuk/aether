@@ -1,81 +1,61 @@
 {
   "schema": "aether.layer-conformance/k0-0.4",
   "asr": {
-    "accept": [
-      {
-        "schema": "aether.asr/k0-0.4",
-        "language_version": "0.4.0-draft",
-        "core_layer": "K0",
-        "module": "boundary",
-        "items": [
-          {
-            "kind": "function",
-            "symbol": "sym:0123456789abcdef",
-            "name": "main",
-            "visibility": "private",
-            "type": "unit",
-            "contracts": []
-          }
-        ]
-      }
-    ],
-    "reject": [
-      {
-        "id": "asr.effect-field",
-        "value": {
-          "schema": "aether.asr/k0-0.4",
-          "language_version": "0.4.0-draft",
-          "core_layer": "K0",
-          "module": "boundary",
+    "fixture": {
+      "schema": "aether.asr/k0-0.4",
+      "language_version": "0.4.0-draft",
+      "core_layer": "K0",
+      "package_id": "boundary",
+      "target": "k0-reference-64",
+      "entry": "sym:0123456789abcdef",
+      "modules": [
+        {
+          "path": "boundary",
+          "source": "src/boundary.ae",
           "items": [
             {
               "kind": "function",
-              "symbol": "sym:0123456789abcdef",
-              "name": "main",
+              "identity": {
+                "id": "sym:0123456789abcdef",
+                "package": "boundary",
+                "module": "boundary",
+                "namespace": "value",
+                "name": "main",
+                "kind": "function"
+              },
               "visibility": "private",
-              "type": "unit",
+              "lifetimes": [],
+              "params": [],
+              "result": { "kind": "primitive", "name": "unit" },
               "contracts": [],
-              "effects": ["io"]
+              "body": { "kind": "block", "statements": [], "tail": null }
             }
           ]
         }
+      ]
+    },
+    "reject": [
+      {
+        "id": "asr.effect-field",
+        "mutation": { "path": ["modules", 0, "items", 0, "effects"], "value": ["io"] }
       },
       {
         "id": "asr.task-kind",
-        "value": {
-          "schema": "aether.asr/k0-0.4",
-          "language_version": "0.4.0-draft",
-          "core_layer": "K0",
-          "module": "boundary",
-          "items": [
-            {
-              "kind": "task",
-              "symbol": "sym:0123456789abcdef",
-              "name": "main",
-              "visibility": "private"
-            }
-          ]
-        }
+        "mutation": { "path": ["modules", 0, "items", 0, "kind"], "value": "task" }
       },
       {
         "id": "asr.layer-upgrade",
-        "value": {
-          "schema": "aether.asr/k0-0.4",
-          "language_version": "0.4.0-draft",
-          "core_layer": "K1",
-          "module": "boundary",
-          "items": []
-        }
+        "mutation": { "path": ["core_layer"], "value": "K1" }
       },
       {
         "id": "asr.root-capabilities",
-        "value": {
-          "schema": "aether.asr/k0-0.4",
-          "language_version": "0.4.0-draft",
-          "core_layer": "K0",
-          "module": "boundary",
-          "items": [],
-          "capabilities": []
+        "mutation": { "path": ["capabilities"], "value": [] }
+      },
+      {
+        "id": "asr.unresolved-path",
+        "mutation": {
+          "path": ["modules", 0, "items", 0, "body", "tail"],
+          "value": { "kind": "path", "path": ["unknown"] }
         }
       }
     ]
