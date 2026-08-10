@@ -307,14 +307,14 @@
     },
     {
       "path": "tools/resolver-python.py",
-      "bytes": 35505,
-      "sha256": "128e55e3820045e9760de91dbdd28c0d0cf3850a13a5a45dedfe204a0aa00c0f"
+      "bytes": 35536,
+      "sha256": "59abc5f40d9f19715a6b8d1ea9eafecf421b62ad96b6a2be6ee012d85a0869c7"
     },
     {
       "path": "tools/validate-spec.mjs",
-      "bytes": 46863,
-      "sha256": "cb956b6bd577185e46d16733fed32f4a964b1e39663d5f5b35446df9966b963f"
+      "bytes": 46942,
+      "sha256": "f7453a987ffde29e5024e91c0a8de5aef2feca29400ffe8f2e34eb22581794fd"
     }
   ],
-  "root_hash": "f8ee50c58becf075cb0f4abf203f059bdfa9407f7438ac77525f4dd62dba5086"
+  "root_hash": "9cf1fadf1cf399e4757233c2f4d526978a7b8e3d66b3dc17e7d19c7c105950dd"
 }

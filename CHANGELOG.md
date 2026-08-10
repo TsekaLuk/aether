@@ -21,6 +21,9 @@
 - Added independent Node and Python resolvers with 38 agreeing resolution inputs;
   11 accepted outputs pass the closed resolved-ASR schema and identity-closure
   audit, while 6 structurally valid semantic-tampering mutations reject.
+- Kept generated Python bytecode outside the content-addressed specification by
+  disabling resolver bytecode writes and excluding cache artifacts from lock
+  traversal.
 - Indexed all 69 K0/MEM rules; 26 now carry executable evidence and 43 preserve
   explicit evidence gaps.
 - Selected replay-compatible Lean 4.24.0 through LDR-0005 and checked four

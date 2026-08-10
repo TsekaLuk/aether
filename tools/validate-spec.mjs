@@ -33,6 +33,7 @@ function readJson(file) {
 function allFiles(directory) {
   const files = [];
   for (const entry of fs.readdirSync(directory, { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name))) {
+    if (entry.name === "__pycache__" || entry.name.endsWith(".pyc")) continue;
     const absolute = path.join(directory, entry.name);
     if (entry.isDirectory()) files.push(...allFiles(absolute));
     else files.push(absolute);

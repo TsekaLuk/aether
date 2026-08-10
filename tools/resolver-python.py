@@ -6,6 +6,7 @@ import pathlib
 import sys
 
 
+sys.dont_write_bytecode = True
 PARSER_PATH = pathlib.Path(__file__).with_name("parser-python.py")
 PARSER_SPEC = importlib.util.spec_from_file_location("aether_parser_python", PARSER_PATH)
 PARSER = importlib.util.module_from_spec(PARSER_SPEC)

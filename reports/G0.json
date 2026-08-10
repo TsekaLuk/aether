@@ -1,7 +1,7 @@
 {
   "schema": "aether.g0-report/0.4",
   "status": "FAIL",
-  "spec_lock_hash": "sha256:f8ee50c58becf075cb0f4abf203f059bdfa9407f7438ac77525f4dd62dba5086",
+  "spec_lock_hash": "sha256:9cf1fadf1cf399e4757233c2f4d526978a7b8e3d66b3dc17e7d19c7c105950dd",
   "metrics": {
     "parent_prd_rules": 380,
     "indexed_k0_rules": 69,
@@ -34,7 +34,7 @@
       "id": "G0-01",
       "status": "PASS",
       "requirement": "content-addressed spec.lock",
-      "evidence": "sha256:f8ee50c58becf075cb0f4abf203f059bdfa9407f7438ac77525f4dd62dba5086"
+      "evidence": "sha256:9cf1fadf1cf399e4757233c2f4d526978a7b8e3d66b3dc17e7d19c7c105950dd"
     },
     {
       "id": "G0-02",
