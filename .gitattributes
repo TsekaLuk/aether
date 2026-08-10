@@ -4,3 +4,5 @@
 *.mjs text eol=lf
 *.py text eol=lf
 *.ebnf text eol=lf
+*.lean text eol=lf
+*.toml text eol=lf

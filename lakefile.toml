@@ -1,0 +1,7 @@
+name = "aether-k0-proofs"
+version = "0.1.0"
+defaultTargets = ["AetherProofs"]
+
+[[lean_lib]]
+name = "AetherProofs"
+srcDir = "spec/proof/mechanized"

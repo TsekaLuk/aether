@@ -37,3 +37,21 @@ jobs:
 
       - name: Require generated evidence to be committed
         run: git diff --exit-code -- spec/manifests/spec.lock.json reports/G0.json reports/G0.md
+
+  proof-fragment:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7.0.1
+
+      - name: Build and independently check Lean declarations
+        uses: leanprover/lean-action@v1.5.0
+        with:
+          build: true
+          test: false
+          lint: false
+          leanchecker: true
+          nanoda: true
+          nanoda-allow-sorry: false
+          use-mathlib-cache: false

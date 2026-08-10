@@ -1,0 +1,71 @@
+{
+  "schema": "aether.source-conformance/k0-0.4",
+  "reserved_layers": {
+    "unsafe": "K1",
+    "effect": "K1",
+    "capability": "K1",
+    "linear": "K1",
+    "trait": "K1",
+    "impl": "K1",
+    "comptime": "K1",
+    "assume": "K1",
+    "async": "K2",
+    "await": "K2",
+    "spawn": "K2"
+  },
+  "accept": [
+    {
+      "id": "source.minimal",
+      "source": "module minimal;\nfn main() { () }\n"
+    },
+    {
+      "id": "source.all-productions",
+      "source": "module corpus.all;\npub const LIMIT: u64 = 4 * 2;\nstruct Pair {\n  pub first: u64,\n  second: u64,\n  invariant pair.ordered: first <= second;\n}\nenum Choice {\n  None,\n  One(u64),\n  Pair { left: u64, right: u64, },\n  invariant choice.valid: true;\n}\npub fn first(x: &'source Pair) -> &'source u64\nrequires first.visible: true;\nensures first.same: result == x.first;\n{\n  &x.first\n}\nfn exercise(mut_ref: &mut u64, choice: Choice, flag: bool) -> u64 {\n  let mut n: u64 = 1;\n  let p = init Pair { first: n, second: 2, };\n  let empty = init Empty {};\n  let values = [1, 2,];\n  let tuple = (1, true,);\n  let shared = &p.first;\n  let exclusive = &mut *mut_ref;\n  *exclusive = values[0];\n  n = *shared;\n  consume(move tuple);\n  while flag { continue; }\n  loop { break; }\n  if flag {\n    n + 1\n  } else if false {\n    n - 1\n  } else {\n    match choice {\n      Choice::None => n,\n      Choice::One(v) => v,\n      Choice::Pair { left: l, right: r, } => l + r,\n    }\n  }\n}\n"
+    }
+  ],
+  "equivalent": [
+    {
+      "id": "source.trivia-normalization",
+      "sources": [
+        "module same; fn main(){1}",
+        "module same;\r\n// trivia\r\nfn main ( ) { /* value */ 1 }\r\n"
+      ]
+    },
+    {
+      "id": "source.integer-normalization",
+      "sources": [
+        "module same; const N: u64 = 16; fn main(){N}",
+        "module same; const N: u64 = 0x10; fn main(){N}"
+      ]
+    }
+  ],
+  "layer_positions": [
+    "$TOKEN module boundary; fn main(){}",
+    "module boundary.$TOKEN; fn main(){}",
+    "module boundary; fn $TOKEN(){}",
+    "module boundary; fn main(value: $TOKEN){}",
+    "module boundary; fn main(){ $TOKEN; }"
+  ],
+  "raw_reject": [
+    { "id": "lex.invalid-utf8-single", "hex": "ff", "code": "LEX-INVALID-UTF8" },
+    { "id": "lex.invalid-utf8-truncated", "hex": "6d6f64756c6520e282", "code": "LEX-INVALID-UTF8" }
+  ],
+  "reject": [
+    { "id": "layer.unsafe", "source": "module boundary; fn main(){ unsafe; }", "code": "LAYER-FEATURE-DISABLED", "token": "unsafe" },
+    { "id": "layer.async", "source": "module boundary; fn main(){ async; }", "code": "LAYER-FEATURE-DISABLED", "token": "async" },
+    { "id": "layer.await", "source": "module boundary; fn main(){ await; }", "code": "LAYER-FEATURE-DISABLED", "token": "await" },
+    { "id": "layer.spawn", "source": "module boundary; fn main(){ spawn; }", "code": "LAYER-FEATURE-DISABLED", "token": "spawn" },
+    { "id": "layer.effect", "source": "module boundary; fn main(){ effect; }", "code": "LAYER-FEATURE-DISABLED", "token": "effect" },
+    { "id": "layer.capability", "source": "module boundary; fn main(){ capability; }", "code": "LAYER-FEATURE-DISABLED", "token": "capability" },
+    { "id": "layer.linear", "source": "module boundary; fn main(){ linear; }", "code": "LAYER-FEATURE-DISABLED", "token": "linear" },
+    { "id": "layer.trait", "source": "module boundary; trait T {}", "code": "LAYER-FEATURE-DISABLED", "token": "trait" },
+    { "id": "layer.impl", "source": "module boundary; impl T {}", "code": "LAYER-FEATURE-DISABLED", "token": "impl" },
+    { "id": "layer.comptime", "source": "module boundary; comptime fn main(){}", "code": "LAYER-FEATURE-DISABLED", "token": "comptime" },
+    { "id": "layer.assume", "source": "module boundary; fn main(){ assume; }", "code": "LAYER-FEATURE-DISABLED", "token": "assume" },
+    { "id": "lex.unterminated-comment", "source": "module boundary; /*", "code": "LEX-UNTERMINATED-COMMENT" },
+    { "id": "lex.invalid-token", "source": "module boundary; fn main(){ @ }", "code": "LEX-INVALID-TOKEN", "token": "@" },
+    { "id": "lex.non-ascii-token", "source": "量", "code": "LEX-INVALID-TOKEN", "token": "量", "span": { "start": 0, "end": 3 } },
+    { "id": "parse.unexpected-eof", "source": "module boundary; fn main(){", "code": "PARSE-UNEXPECTED-EOF" },
+    { "id": "parse.contract-call", "source": "module boundary; fn main() requires no.call: f(); {}", "code": "PARSE-UNEXPECTED-TOKEN", "token": "(" }
+  ]
+}

@@ -8,3 +8,13 @@
   affine leak behavior.
 - Added content-addressed `spec.lock` generation and a machine-readable G0 report.
 - Recorded G0 as `FAIL` with five explicit blocking workstreams.
+- Proposed a draft K0 surface-grammar closure around explicit aggregate
+  construction, dereference, public lifetime relations, and total contract
+  expressions through LCP-0001/draft LDR-0004.
+- Added independent Node and Python parsers with 77 agreeing source cases and two
+  agreeing invalid UTF-8 byte cases.
+- Added 55 generated reserved-token mutations and 8 closed-schema smuggling
+  probes plus 6 package-manifest probes for the K0 layer boundary.
+- Indexed all 69 K0/MEM rules while preserving 50 explicit evidence gaps.
+- Selected Lean 4.32.2 through LDR-0005 and checked four allocation-cell theorem
+  fragments without proof placeholders.

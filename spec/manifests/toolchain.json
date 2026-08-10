@@ -15,5 +15,18 @@
   ],
   "network_required": false,
   "external_packages": [],
-  "mechanized_proof_tool": null
+  "mechanized_proof_tool": {
+    "name": "Lean 4",
+    "version": "4.32.2",
+    "toolchain": "leanprover/lean4:v4.32.2",
+    "source_commit": "f3b06c705e6c85f5314019d5d3baab0fec5b580c",
+    "release_date": "2026-07-28",
+    "external_packages": [],
+    "independent_checkers": [
+      "leanchecker",
+      "nanoda"
+    ],
+    "sorry_allowed": false,
+    "trusted_stage": "C"
+  }
 }

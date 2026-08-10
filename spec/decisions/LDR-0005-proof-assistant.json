@@ -1,0 +1,30 @@
+{
+  "schema": "aether.ldr/0.4",
+  "id": "LDR-0005",
+  "title": "Lean 4 is the K0 mechanized metatheory checker",
+  "status": "PROVISIONAL",
+  "basis": "G0-06, PRD section 32.9, and proof/TCB.md",
+  "decision": "Use Lean 4 v4.32.2 without third-party packages for K0 metatheory. Lock the release commit and artifact hashes, build every proof in CI, forbid sorryAx, and replay declarations through leanchecker and nanoda. Proofs do not establish conformance until the encoding relation to the normative K0 spec is reviewed.",
+  "dissent": [
+    "Lean's implementation and release binaries enlarge the initial trusted base.",
+    "Rocq has a longer history of independently checked programming-language metatheory.",
+    "A second checker reduces implementation risk but does not validate the Aether-to-Lean encoding."
+  ],
+  "compatibility": {
+    "classification": "proof-tooling-selection",
+    "source": "No Aether source impact.",
+    "semantic": "No runtime behavior changes.",
+    "proof": "Future K0 theorem artifacts use Lean declarations and proof terms.",
+    "abi": "No impact.",
+    "artifact": "Proof tool identity and checked declarations enter spec.lock.",
+    "tooling": "CI and offline replay require the pinned Lean toolchain."
+  },
+  "supersedes": [],
+  "rules": [
+    "K0-ALLOC-006",
+    "K0-ALLOC-009",
+    "K0-CONTRACT-003",
+    "K0-EXEC-001",
+    "K0-EXEC-006"
+  ]
+}

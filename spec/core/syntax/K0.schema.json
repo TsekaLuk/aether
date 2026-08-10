@@ -14,37 +14,271 @@
       "items": { "type": "string", "pattern": "^[A-Z][A-Z0-9-]+-[0-9]{3}$" }
     },
     "target": { "const": "k0-reference-64" },
+    "initial": { "$ref": "#/$defs/initial" },
+    "steps": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/step" }
+    },
+    "expect": { "$ref": "#/$defs/expect" }
+  },
+  "$defs": {
+    "place_name": {
+      "type": "string",
+      "pattern": "^[A-Za-z_][A-Za-z0-9_.-]*$"
+    },
+    "borrow_id": {
+      "type": "string",
+      "pattern": "^[A-Za-z_][A-Za-z0-9_.-]*$"
+    },
+    "allocation_id": {
+      "type": "string",
+      "pattern": "^alloc:[0-9]+$"
+    },
+    "brand": {
+      "type": "string",
+      "pattern": "^brand:[A-Za-z0-9_.-]+$"
+    },
+    "integer_type": {
+      "enum": ["u8", "u16", "u32", "u64", "i8", "i16", "i32", "i64", "usize", "isize"]
+    },
+    "value": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["kind", "type", "value"],
+          "additionalProperties": false,
+          "properties": {
+            "kind": { "const": "int" },
+            "type": { "$ref": "#/$defs/integer_type" },
+            "value": { "type": "integer" }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["kind", "value"],
+          "additionalProperties": false,
+          "properties": {
+            "kind": { "const": "bool" },
+            "value": { "type": "boolean" }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["kind"],
+          "additionalProperties": false,
+          "properties": {
+            "kind": { "const": "unit" }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["kind", "allocation", "brand"],
+          "additionalProperties": false,
+          "properties": {
+            "kind": { "const": "own" },
+            "allocation": { "$ref": "#/$defs/allocation_id" },
+            "brand": { "$ref": "#/$defs/brand" }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["kind", "code", "returned"],
+          "additionalProperties": false,
+          "properties": {
+            "kind": { "const": "alloc_error" },
+            "code": { "const": "ALLOC-EXHAUSTED" },
+            "returned": { "$ref": "#/$defs/value" }
+          }
+        }
+      ]
+    },
+    "place": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["state", "value"],
+          "additionalProperties": false,
+          "properties": {
+            "state": { "const": "initialized" },
+            "value": { "$ref": "#/$defs/value" }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["state"],
+          "additionalProperties": false,
+          "properties": {
+            "state": { "const": "uninitialized" }
+          }
+        }
+      ]
+    },
+    "allocator": {
+      "type": "object",
+      "required": ["brand", "capacity"],
+      "additionalProperties": false,
+      "properties": {
+        "brand": { "$ref": "#/$defs/brand" },
+        "capacity": { "type": "integer", "minimum": 0 }
+      }
+    },
     "initial": {
       "type": "object",
       "required": ["places", "allocators"],
+      "additionalProperties": false,
       "properties": {
-        "places": { "type": "object" },
-        "allocators": { "type": "object" }
-      },
-      "additionalProperties": false
+        "places": {
+          "type": "object",
+          "additionalProperties": { "$ref": "#/$defs/place" }
+        },
+        "allocators": {
+          "type": "object",
+          "additionalProperties": { "$ref": "#/$defs/allocator" }
+        }
+      }
     },
-    "steps": {
-      "type": "array",
-      "items": {
-        "type": "object",
-        "required": ["op"],
-        "properties": {
-          "op": {
-            "enum": ["declare", "move", "copy", "use", "borrow", "end_borrow", "alloc", "dealloc", "drop"]
+    "step": {
+      "oneOf": [
+        { "$ref": "#/$defs/declare_step" },
+        { "$ref": "#/$defs/transfer_step" },
+        { "$ref": "#/$defs/place_step" },
+        { "$ref": "#/$defs/borrow_step" },
+        { "$ref": "#/$defs/end_borrow_step" },
+        { "$ref": "#/$defs/alloc_step" },
+        { "$ref": "#/$defs/dealloc_step" }
+      ]
+    },
+    "declare_step": {
+      "type": "object",
+      "required": ["op", "place", "value"],
+      "additionalProperties": false,
+      "properties": {
+        "op": { "const": "declare" },
+        "place": { "$ref": "#/$defs/place_name" },
+        "value": { "$ref": "#/$defs/value" }
+      }
+    },
+    "transfer_step": {
+      "type": "object",
+      "required": ["op", "from", "to"],
+      "additionalProperties": false,
+      "properties": {
+        "op": { "enum": ["move", "copy"] },
+        "from": { "$ref": "#/$defs/place_name" },
+        "to": { "$ref": "#/$defs/place_name" }
+      }
+    },
+    "place_step": {
+      "type": "object",
+      "required": ["op", "place"],
+      "additionalProperties": false,
+      "properties": {
+        "op": { "enum": ["use", "drop"] },
+        "place": { "$ref": "#/$defs/place_name" }
+      }
+    },
+    "borrow_step": {
+      "type": "object",
+      "required": ["op", "kind", "from", "id", "pointee"],
+      "additionalProperties": false,
+      "properties": {
+        "op": { "const": "borrow" },
+        "kind": { "enum": ["shared", "exclusive"] },
+        "from": { "$ref": "#/$defs/place_name" },
+        "id": { "$ref": "#/$defs/borrow_id" },
+        "pointee": { "type": "boolean" }
+      }
+    },
+    "end_borrow_step": {
+      "type": "object",
+      "required": ["op", "id"],
+      "additionalProperties": false,
+      "properties": {
+        "op": { "const": "end_borrow" },
+        "id": { "$ref": "#/$defs/borrow_id" }
+      }
+    },
+    "alloc_step": {
+      "type": "object",
+      "required": ["op", "allocator", "from", "ok", "err", "allocation"],
+      "additionalProperties": false,
+      "properties": {
+        "op": { "const": "alloc" },
+        "allocator": { "$ref": "#/$defs/place_name" },
+        "from": { "$ref": "#/$defs/place_name" },
+        "ok": { "$ref": "#/$defs/place_name" },
+        "err": { "$ref": "#/$defs/place_name" },
+        "allocation": { "$ref": "#/$defs/allocation_id" }
+      }
+    },
+    "dealloc_step": {
+      "type": "object",
+      "required": ["op", "allocator", "from", "to"],
+      "additionalProperties": false,
+      "properties": {
+        "op": { "const": "dealloc" },
+        "allocator": { "$ref": "#/$defs/place_name" },
+        "from": { "$ref": "#/$defs/place_name" },
+        "to": { "$ref": "#/$defs/place_name" }
+      }
+    },
+    "event": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["event", "place", "value"],
+          "additionalProperties": false,
+          "properties": {
+            "event": { "const": "use" },
+            "place": { "$ref": "#/$defs/place_name" },
+            "value": { "$ref": "#/$defs/value" }
           }
         },
-        "additionalProperties": true
-      }
+        {
+          "type": "object",
+          "required": ["event", "allocation", "brand"],
+          "additionalProperties": false,
+          "properties": {
+            "event": { "enum": ["alloc", "dealloc"] },
+            "allocation": { "$ref": "#/$defs/allocation_id" },
+            "brand": { "$ref": "#/$defs/brand" }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["event", "brand", "code"],
+          "additionalProperties": false,
+          "properties": {
+            "event": { "const": "alloc_failure" },
+            "brand": { "$ref": "#/$defs/brand" },
+            "code": { "const": "ALLOC-EXHAUSTED" }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["event", "allocation", "brand", "code"],
+          "additionalProperties": false,
+          "properties": {
+            "event": { "const": "leak" },
+            "allocation": { "$ref": "#/$defs/allocation_id" },
+            "brand": { "$ref": "#/$defs/brand" },
+            "code": { "const": "DROP-LEAK" }
+          }
+        }
+      ]
     },
     "expect": {
       "type": "object",
       "required": ["status"],
+      "additionalProperties": false,
       "properties": {
         "status": { "enum": ["ok", "rejected"] },
         "code": { "type": "string" },
-        "events": { "type": "array" }
-      },
-      "additionalProperties": false
+        "events": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/event" }
+        }
+      }
     }
   }
 }

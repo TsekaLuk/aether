@@ -2,6 +2,46 @@
   "schema_version": "aether.errors/k0-0.4",
   "status": "DRAFT",
   "errors": [
+    {
+      "code": "LAYER-FEATURE-DISABLED",
+      "phase": "lexical",
+      "class": "REJECTED"
+    },
+    {
+      "code": "LEX-INVALID-UTF8",
+      "phase": "lexical",
+      "class": "REJECTED"
+    },
+    {
+      "code": "LEX-INVALID-TOKEN",
+      "phase": "lexical",
+      "class": "REJECTED"
+    },
+    {
+      "code": "LEX-UNTERMINATED-COMMENT",
+      "phase": "lexical",
+      "class": "REJECTED"
+    },
+    {
+      "code": "PARSE-UNEXPECTED-TOKEN",
+      "phase": "parse",
+      "class": "REJECTED"
+    },
+    {
+      "code": "PARSE-UNEXPECTED-EOF",
+      "phase": "parse",
+      "class": "REJECTED"
+    },
+    {
+      "code": "SYMBOL-ID-COLLISION",
+      "phase": "resolve",
+      "class": "REJECTED"
+    },
+    {
+      "code": "CONST-CYCLE",
+      "phase": "resolve",
+      "class": "REJECTED"
+    },
     { "code": "PLACE-UNINITIALIZED", "phase": "static", "class": "REJECTED" },
     { "code": "MOVE-BORROWED", "phase": "static", "class": "REJECTED" },
     { "code": "MOVE-SOURCE-UNINITIALIZED", "phase": "static", "class": "REJECTED" },
