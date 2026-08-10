@@ -1,0 +1,39 @@
+name: K0 specification
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: spec-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7.0.1
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7.0.0
+        with:
+          node-version: 26.4.0
+
+      - name: Set up Python
+        uses: actions/setup-python@v7.0.0
+        with:
+          python-version: 3.9.6
+
+      - name: Validate executable specification
+        run: npm test
+
+      - name: Require generated evidence to be committed
+        run: git diff --exit-code -- spec/manifests/spec.lock.json reports/G0.json reports/G0.md

@@ -1,0 +1,84 @@
+(* Aether K0 surface grammar, draft v0.4. EBNF metasymbols are not tokens. *)
+
+source_file       = module_decl, item* ;
+module_decl       = "module", module_path, ";" ;
+module_path       = IDENT, (".", IDENT)* ;
+
+item              = visibility?, (const_decl | struct_decl | enum_decl | fn_decl) ;
+visibility        = "pub" ;
+const_decl        = "const", IDENT, ":", type, "=", expression, ";" ;
+struct_decl       = "struct", IDENT, "{", field_decl*, "}" ;
+field_decl        = visibility?, IDENT, ":", type, "," ;
+enum_decl         = "enum", IDENT, "{", variant_decl*, "}" ;
+variant_decl      = IDENT, variant_payload?, "," ;
+variant_payload   = "(", type_list?, ")" | "{", field_decl*, "}" ;
+
+fn_decl           = "fn", IDENT, "(", param_list?, ")", return_type?,
+                    contract_clause*, block ;
+param_list        = param, (",", param)*, ","? ;
+param             = IDENT, ":", type ;
+return_type       = "->", type ;
+contract_clause   = ("requires" | "ensures"), contract_id, ":", expression, ";" ;
+contract_id       = IDENT, (".", IDENT)* ;
+
+type              = primitive_type | path_type | tuple_type | array_type |
+                    slice_type | reference_type | builtin_type ;
+primitive_type    = "bool" | "unit" |
+                    "u8" | "u16" | "u32" | "u64" |
+                    "i8" | "i16" | "i32" | "i64" |
+                    "usize" | "isize" ;
+path_type         = IDENT, ("::", IDENT)* ;
+tuple_type        = "(", type_list?, ")" ;
+type_list         = type, (",", type)*, ","? ;
+array_type        = "[", type, ";", integer_literal, "]" ;
+slice_type        = "[", type, "]" ;
+reference_type    = "&", "mut"?, type ;
+builtin_type      = ("Own" | "Allocator" | "Result"),
+                    "<", type_list, ">" ;
+
+block             = "{", statement*, tail_expression?, "}" ;
+statement         = let_statement | assignment | expression_statement |
+                    return_statement | if_statement | while_statement |
+                    loop_statement | break_statement | continue_statement ;
+let_statement     = "let", "mut"?, IDENT, type_annotation?,
+                    "=", expression, ";" ;
+type_annotation   = ":", type ;
+assignment        = place_expression, "=", expression, ";" ;
+expression_statement = expression, ";" ;
+return_statement  = "return", expression?, ";" ;
+if_statement      = "if", expression, block, ("else", block)? ;
+while_statement   = "while", expression, block ;
+loop_statement    = "loop", block ;
+break_statement   = "break", ";" ;
+continue_statement = "continue", ";" ;
+tail_expression   = expression ;
+
+expression        = logical_or ;
+logical_or        = logical_and, ("||", logical_and)* ;
+logical_and       = equality, ("&&", equality)* ;
+equality          = comparison, (("==" | "!="), comparison)* ;
+comparison        = additive, (("<" | "<=" | ">" | ">="), additive)* ;
+additive          = multiplicative, (("+" | "-"), multiplicative)* ;
+multiplicative    = unary, (("*" | "/" | "%"), unary)* ;
+unary             = unary_operator*, postfix ;
+unary_operator    = "!" | "-" | "move" | borrow_mut_operator | "&" ;
+borrow_mut_operator = "&", "mut" ;
+postfix           = primary, (call_suffix | field_suffix | index_suffix)* ;
+call_suffix       = "(", argument_list?, ")" ;
+argument_list     = expression, (",", expression)*, ","? ;
+field_suffix      = ".", IDENT ;
+index_suffix      = "[", expression, "]" ;
+primary           = literal | path_expression | tuple_expression |
+                    array_expression | block | match_expression |
+                    "(", expression, ")" ;
+path_expression   = IDENT, ("::", IDENT)* ;
+place_expression  = path_expression, (field_suffix | index_suffix)* ;
+tuple_expression  = "(", (expression, ",", argument_list?)?, ")" ;
+array_expression  = "[", argument_list?, "]" ;
+match_expression  = "match", expression, "{", match_arm+, "}" ;
+match_arm         = pattern, "=>", expression, "," ;
+pattern           = "_" | IDENT | literal | path_expression |
+                    "(", pattern_list?, ")" ;
+pattern_list      = pattern, (",", pattern)*, ","? ;
+literal           = integer_literal | "true" | "false" ;
+integer_literal   = DEC_INTEGER | BIN_INTEGER | OCT_INTEGER | HEX_INTEGER ;

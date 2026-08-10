@@ -1,0 +1,101 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://aether.invalid/spec/0.4/asr/K0.schema.json",
+  "title": "Aether K0 Resolved ASR",
+  "type": "object",
+  "required": ["schema", "language_version", "module", "items"],
+  "additionalProperties": false,
+  "properties": {
+    "schema": { "const": "aether.asr/k0-0.4" },
+    "language_version": { "const": "0.4.0-draft" },
+    "module": { "type": "string", "pattern": "^[A-Za-z_][A-Za-z0-9_]*(\\.[A-Za-z_][A-Za-z0-9_]*)*$" },
+    "items": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/item" }
+    }
+  },
+  "$defs": {
+    "symbol": {
+      "type": "string",
+      "pattern": "^sym:[a-f0-9]{16,64}$"
+    },
+    "type": {
+      "oneOf": [
+        { "enum": ["bool", "unit", "u8", "u16", "u32", "u64", "i8", "i16", "i32", "i64", "usize", "isize"] },
+        {
+          "type": "object",
+          "required": ["kind", "symbol"],
+          "properties": {
+            "kind": { "const": "nominal" },
+            "symbol": { "$ref": "#/$defs/symbol" }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": ["kind", "element"],
+          "properties": {
+            "kind": { "enum": ["shared_ref", "mut_ref", "slice"] },
+            "element": { "$ref": "#/$defs/type" }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": ["kind", "element", "length"],
+          "properties": {
+            "kind": { "const": "array" },
+            "element": { "$ref": "#/$defs/type" },
+            "length": { "type": "integer", "minimum": 0 }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": ["kind", "value", "brand"],
+          "properties": {
+            "kind": { "const": "own" },
+            "value": { "$ref": "#/$defs/type" },
+            "brand": { "type": "string", "pattern": "^brand:[A-Za-z0-9_.-]+$" }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": ["kind", "brand"],
+          "properties": {
+            "kind": { "const": "allocator" },
+            "brand": { "type": "string", "pattern": "^brand:[A-Za-z0-9_.-]+$" }
+          },
+          "additionalProperties": false
+        }
+      ]
+    },
+    "item": {
+      "type": "object",
+      "required": ["kind", "symbol", "name", "visibility"],
+      "properties": {
+        "kind": { "enum": ["const", "struct", "enum", "function"] },
+        "symbol": { "$ref": "#/$defs/symbol" },
+        "name": { "type": "string", "pattern": "^[A-Za-z_][A-Za-z0-9_]*$" },
+        "visibility": { "enum": ["private", "public"] },
+        "type": { "$ref": "#/$defs/type" },
+        "contracts": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["id", "kind", "status", "expression_hash"],
+            "properties": {
+              "id": { "type": "string" },
+              "kind": { "enum": ["requires", "ensures", "invariant"] },
+              "status": { "const": "DECLARED_UNPROVEN" },
+              "expression_hash": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" }
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "additionalProperties": true
+    }
+  }
+}

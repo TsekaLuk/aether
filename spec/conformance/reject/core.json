@@ -1,0 +1,127 @@
+[
+  {
+    "schema": "aether.core-transition/k0-0.4",
+    "id": "reject.use_after_move",
+    "rules": ["K0-PLACE-002", "K0-PLACE-003", "CONF-004"],
+    "target": "k0-reference-64",
+    "initial": {
+      "places": { "x": { "state": "initialized", "value": { "kind": "int", "type": "u8", "value": 7 } } },
+      "allocators": {}
+    },
+    "steps": [
+      { "op": "move", "from": "x", "to": "y" },
+      { "op": "use", "place": "x" }
+    ],
+    "expect": { "status": "rejected", "code": "PLACE-UNINITIALIZED" }
+  },
+  {
+    "schema": "aether.core-transition/k0-0.4",
+    "id": "reject.double_move",
+    "rules": ["K0-PLACE-003"],
+    "target": "k0-reference-64",
+    "initial": {
+      "places": { "x": { "state": "initialized", "value": { "kind": "int", "type": "u8", "value": 7 } } },
+      "allocators": {}
+    },
+    "steps": [
+      { "op": "move", "from": "x", "to": "y" },
+      { "op": "move", "from": "x", "to": "z" }
+    ],
+    "expect": { "status": "rejected", "code": "MOVE-SOURCE-UNINITIALIZED" }
+  },
+  {
+    "schema": "aether.core-transition/k0-0.4",
+    "id": "reject.mut_conflicts_shared",
+    "rules": ["K0-BORROW-002", "K0-BORROW-003"],
+    "target": "k0-reference-64",
+    "initial": {
+      "places": { "x": { "state": "initialized", "value": { "kind": "int", "type": "u8", "value": 1 } } },
+      "allocators": {}
+    },
+    "steps": [
+      { "op": "borrow", "kind": "shared", "from": "x", "id": "b0", "pointee": false },
+      { "op": "borrow", "kind": "exclusive", "from": "x", "id": "b1", "pointee": false }
+    ],
+    "expect": { "status": "rejected", "code": "BORROW-CONFLICT" }
+  },
+  {
+    "schema": "aether.core-transition/k0-0.4",
+    "id": "reject.move_while_borrowed",
+    "rules": ["K0-BORROW-002"],
+    "target": "k0-reference-64",
+    "initial": {
+      "places": { "x": { "state": "initialized", "value": { "kind": "int", "type": "u8", "value": 1 } } },
+      "allocators": {}
+    },
+    "steps": [
+      { "op": "borrow", "kind": "shared", "from": "x", "id": "b0", "pointee": false },
+      { "op": "move", "from": "x", "to": "y" }
+    ],
+    "expect": { "status": "rejected", "code": "MOVE-BORROWED" }
+  },
+  {
+    "schema": "aether.core-transition/k0-0.4",
+    "id": "reject.copy_owner",
+    "rules": ["K0-ALLOC-002"],
+    "target": "k0-reference-64",
+    "initial": {
+      "places": { "x": { "state": "initialized", "value": { "kind": "int", "type": "u8", "value": 1 } } },
+      "allocators": { "main": { "brand": "brand:heap.main", "capacity": 1 } }
+    },
+    "steps": [
+      { "op": "alloc", "allocator": "main", "from": "x", "ok": "owner", "err": "failure", "allocation": "alloc:0" },
+      { "op": "copy", "from": "owner", "to": "owner2" }
+    ],
+    "expect": { "status": "rejected", "code": "COPY-NONCOPY" }
+  },
+  {
+    "schema": "aether.core-transition/k0-0.4",
+    "id": "reject.wrong_brand",
+    "rules": ["K0-ALLOC-003", "K0-ALLOC-007", "K0-ALLOC-010"],
+    "target": "k0-reference-64",
+    "initial": {
+      "places": { "x": { "state": "initialized", "value": { "kind": "int", "type": "u8", "value": 1 } } },
+      "allocators": {
+        "main": { "brand": "brand:heap.main", "capacity": 1 },
+        "scratch": { "brand": "brand:heap.scratch", "capacity": 1 }
+      }
+    },
+    "steps": [
+      { "op": "alloc", "allocator": "main", "from": "x", "ok": "owner", "err": "failure", "allocation": "alloc:0" },
+      { "op": "dealloc", "allocator": "scratch", "from": "owner", "to": "y" }
+    ],
+    "expect": { "status": "rejected", "code": "DEALLOC-BRAND-MISMATCH" }
+  },
+  {
+    "schema": "aether.core-transition/k0-0.4",
+    "id": "reject.dealloc_borrowed",
+    "rules": ["K0-ALLOC-003"],
+    "target": "k0-reference-64",
+    "initial": {
+      "places": { "x": { "state": "initialized", "value": { "kind": "int", "type": "u8", "value": 1 } } },
+      "allocators": { "main": { "brand": "brand:heap.main", "capacity": 1 } }
+    },
+    "steps": [
+      { "op": "alloc", "allocator": "main", "from": "x", "ok": "owner", "err": "failure", "allocation": "alloc:0" },
+      { "op": "borrow", "kind": "shared", "from": "owner", "id": "b0", "pointee": true },
+      { "op": "dealloc", "allocator": "main", "from": "owner", "to": "y" }
+    ],
+    "expect": { "status": "rejected", "code": "DEALLOC-BORROWED" }
+  },
+  {
+    "schema": "aether.core-transition/k0-0.4",
+    "id": "reject.double_dealloc",
+    "rules": ["K0-ALLOC-004", "K0-ALLOC-006", "MEM-OBJ-004"],
+    "target": "k0-reference-64",
+    "initial": {
+      "places": { "x": { "state": "initialized", "value": { "kind": "int", "type": "u8", "value": 1 } } },
+      "allocators": { "main": { "brand": "brand:heap.main", "capacity": 1 } }
+    },
+    "steps": [
+      { "op": "alloc", "allocator": "main", "from": "x", "ok": "owner", "err": "failure", "allocation": "alloc:0" },
+      { "op": "dealloc", "allocator": "main", "from": "owner", "to": "y" },
+      { "op": "dealloc", "allocator": "main", "from": "owner", "to": "z" }
+    ],
+    "expect": { "status": "rejected", "code": "PLACE-UNINITIALIZED" }
+  }
+]

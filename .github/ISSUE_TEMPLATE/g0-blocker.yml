@@ -1,0 +1,37 @@
+name: G0 blocker
+description: Track a concrete item preventing formal K0 implementation
+title: "[G0] "
+labels: ["g0-blocker"]
+body:
+  - type: dropdown
+    id: gate
+    attributes:
+      label: Gate
+      options:
+        - G0-02 Core semantics
+        - G0-03 object/resource states
+        - G0-04 Rule ID coverage
+        - G0-06 mechanized metatheory
+        - G0-08 layer isolation
+    validations:
+      required: true
+  - type: textarea
+    id: rule_ids
+    attributes:
+      label: Rule IDs
+      description: List every affected parent PRD or specification Rule ID.
+    validations:
+      required: true
+  - type: textarea
+    id: counterexample
+    attributes:
+      label: Minimal counterexample or missing artifact
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance evidence
+      description: State the rules, tests, model, or proof required to close this item.
+    validations:
+      required: true

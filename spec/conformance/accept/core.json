@@ -1,0 +1,91 @@
+[
+  {
+    "schema": "aether.core-transition/k0-0.4",
+    "id": "accept.move_once",
+    "rules": ["K0-PLACE-002", "CONF-004"],
+    "target": "k0-reference-64",
+    "initial": {
+      "places": {
+        "x": { "state": "initialized", "value": { "kind": "int", "type": "u8", "value": 7 } }
+      },
+      "allocators": {}
+    },
+    "steps": [
+      { "op": "move", "from": "x", "to": "y" },
+      { "op": "use", "place": "y" }
+    ],
+    "expect": { "status": "ok" }
+  },
+  {
+    "schema": "aether.core-transition/k0-0.4",
+    "id": "accept.shared_then_move",
+    "rules": ["K0-BORROW-001", "K0-BORROW-004", "CONF-004"],
+    "target": "k0-reference-64",
+    "initial": {
+      "places": {
+        "x": { "state": "initialized", "value": { "kind": "int", "type": "u16", "value": 300 } }
+      },
+      "allocators": {}
+    },
+    "steps": [
+      { "op": "borrow", "kind": "shared", "from": "x", "id": "b0", "pointee": false },
+      { "op": "end_borrow", "id": "b0" },
+      { "op": "move", "from": "x", "to": "y" },
+      { "op": "use", "place": "y" }
+    ],
+    "expect": { "status": "ok" }
+  },
+  {
+    "schema": "aether.core-transition/k0-0.4",
+    "id": "accept.alloc_dealloc",
+    "rules": ["K0-ALLOC-001", "K0-ALLOC-003", "K0-ALLOC-004", "K0-ALLOC-008", "CONF-003"],
+    "target": "k0-reference-64",
+    "initial": {
+      "places": {
+        "x": { "state": "initialized", "value": { "kind": "int", "type": "u32", "value": 42 } }
+      },
+      "allocators": {
+        "main": { "brand": "brand:heap.main", "capacity": 2 }
+      }
+    },
+    "steps": [
+      { "op": "alloc", "allocator": "main", "from": "x", "ok": "owner", "err": "failure", "allocation": "alloc:0" },
+      { "op": "dealloc", "allocator": "main", "from": "owner", "to": "y" },
+      { "op": "use", "place": "y" }
+    ],
+    "expect": {
+      "status": "ok",
+      "events": [
+        { "event": "alloc", "allocation": "alloc:0", "brand": "brand:heap.main" },
+        { "event": "dealloc", "allocation": "alloc:0", "brand": "brand:heap.main" },
+        { "event": "use", "place": "y", "value": { "kind": "int", "type": "u32", "value": 42 } }
+      ]
+    }
+  },
+  {
+    "schema": "aether.core-transition/k0-0.4",
+    "id": "accept.two_fresh_allocations",
+    "rules": ["K0-ALLOC-001", "MEM-OBJ-001"],
+    "target": "k0-reference-64",
+    "initial": {
+      "places": {
+        "x": { "state": "initialized", "value": { "kind": "int", "type": "u8", "value": 1 } },
+        "y": { "state": "initialized", "value": { "kind": "int", "type": "u8", "value": 2 } }
+      },
+      "allocators": {
+        "main": { "brand": "brand:heap.main", "capacity": 2 }
+      }
+    },
+    "steps": [
+      { "op": "alloc", "allocator": "main", "from": "x", "ok": "owner_x", "err": "failure_x", "allocation": "alloc:0" },
+      { "op": "alloc", "allocator": "main", "from": "y", "ok": "owner_y", "err": "failure_y", "allocation": "alloc:1" }
+    ],
+    "expect": {
+      "status": "ok",
+      "events": [
+        { "event": "alloc", "allocation": "alloc:0", "brand": "brand:heap.main" },
+        { "event": "alloc", "allocation": "alloc:1", "brand": "brand:heap.main" }
+      ]
+    }
+  }
+]

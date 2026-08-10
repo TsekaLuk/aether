@@ -1,0 +1,137 @@
+{
+  "schema": "aether.g0-report/0.4",
+  "status": "FAIL",
+  "spec_lock_hash": "sha256:8d35ddf614aa045bf7f20f4aa969b8cb2233d5e2fc1a9050c89b899b6d03679d",
+  "metrics": {
+    "parent_prd_rules": 380,
+    "indexed_k0_rules": 21,
+    "required_k0_and_memory_rules": 69,
+    "missing_k0_and_memory_rules": 50,
+    "conformance_vectors": 14,
+    "independent_executor_agreements": 14,
+    "explicit_open_markers": 7,
+    "mechanized_theorems_proved": 0
+  },
+  "checks": [
+    {
+      "id": "G0-01",
+      "status": "PASS",
+      "requirement": "content-addressed spec.lock",
+      "evidence": "sha256:8d35ddf614aa045bf7f20f4aa969b8cb2233d5e2fc1a9050c89b899b6d03679d"
+    },
+    {
+      "id": "G0-02",
+      "status": "FAIL",
+      "requirement": "complete K0 Core grammar and static/dynamic semantics",
+      "evidence": "transition subset exists; full expression/control-flow model remains OPEN"
+    },
+    {
+      "id": "G0-03",
+      "status": "FAIL",
+      "requirement": "complete object/resource state machines",
+      "evidence": "move, borrow, allocation, deallocation, and leak subset executes; fields, arrays, calls, joins, and numeric states remain OPEN"
+    },
+    {
+      "id": "G0-04",
+      "status": "FAIL",
+      "requirement": "every frozen K0 Rule ID linked to conformance evidence",
+      "evidence": "21/69 K0/MEM rules indexed; 0 marked STABLE"
+    },
+    {
+      "id": "G0-05",
+      "status": "PASS",
+      "requirement": "two independent Core executors agree",
+      "evidence": "14/14 vectors agree byte-for-structure"
+    },
+    {
+      "id": "G0-06",
+      "status": "FAIL",
+      "requirement": "mechanized metatheory repository",
+      "evidence": "theorem ledger exists; no theorem is PROVED and no proof tool is locked"
+    },
+    {
+      "id": "G0-07",
+      "status": "PASS",
+      "requirement": "host toolchain and initial TCB recorded",
+      "evidence": "Node and Python versions validated; no external package or network dependency"
+    },
+    {
+      "id": "G0-08",
+      "status": "FAIL",
+      "requirement": "K1/K2 unreachable from K0 stable entry",
+      "evidence": "later tokens are reserved, but no complete source parser or ASR reachability proof exists"
+    },
+    {
+      "id": "G0-09",
+      "status": "PASS",
+      "requirement": "K1 computation-universality requirements frozen without expanding K0",
+      "evidence": "EXEC-001..008 and TC-001..008 exist in parent PRD"
+    },
+    {
+      "id": "G0-10",
+      "status": "PASS",
+      "requirement": "offline-readable review and OPEN inventory",
+      "evidence": "7 explicit OPEN markers; report and lock are local files"
+    }
+  ],
+  "blockers": [
+    "G0-02",
+    "G0-03",
+    "G0-04",
+    "G0-06",
+    "G0-08"
+  ],
+  "missing_rule_ids": [
+    "K0-BORROW-005",
+    "K0-BORROW-006",
+    "K0-CF-001",
+    "K0-CF-002",
+    "K0-CF-003",
+    "K0-CF-004",
+    "K0-CF-005",
+    "K0-CF-006",
+    "K0-CONTRACT-001",
+    "K0-CONTRACT-002",
+    "K0-CONTRACT-003",
+    "K0-CONTRACT-004",
+    "K0-CONTRACT-005",
+    "K0-EXEC-001",
+    "K0-EXEC-002",
+    "K0-EXEC-003",
+    "K0-EXEC-004",
+    "K0-EXEC-005",
+    "K0-EXEC-006",
+    "K0-HOST-001",
+    "K0-HOST-002",
+    "K0-HOST-003",
+    "K0-HOST-004",
+    "K0-PLACE-001",
+    "K0-PLACE-004",
+    "K0-PLACE-005",
+    "K0-PLACE-006",
+    "K0-TYPE-001",
+    "K0-TYPE-002",
+    "K0-TYPE-003",
+    "K0-TYPE-004",
+    "K0-TYPE-005",
+    "K0-TYPE-006",
+    "MEM-LIFE-001",
+    "MEM-LIFE-003",
+    "MEM-LIFE-004",
+    "MEM-LIFE-005",
+    "MEM-OBJ-002",
+    "MEM-OBJ-003",
+    "MEM-REF-001",
+    "MEM-REF-002",
+    "MEM-REF-003",
+    "MEM-REF-004",
+    "MEM-REF-005",
+    "MEM-REP-001",
+    "MEM-REP-002",
+    "MEM-REP-003",
+    "MEM-REP-004",
+    "MEM-REP-005",
+    "MEM-REP-006"
+  ],
+  "authorization": "Only specification engineering and disposable semantic probes are authorized."
+}

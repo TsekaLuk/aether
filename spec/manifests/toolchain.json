@@ -1,0 +1,12 @@
+{
+  "schema": "aether.toolchain/0.4",
+  "status": "DRAFT",
+  "host": "portable POSIX host",
+  "tools": [
+    { "role": "primary transition executor and validator", "command": "node", "version": "26.4.0", "trusted_stage": "A" },
+    { "role": "independent transition executor", "command": "python3", "version": "3.9.6", "trusted_stage": "A" }
+  ],
+  "network_required": false,
+  "external_packages": [],
+  "mechanized_proof_tool": null
+}

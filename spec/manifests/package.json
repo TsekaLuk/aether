@@ -1,0 +1,27 @@
+{
+  "schema": "aether.spec-manifest/0.4",
+  "language_version": "0.4.0-draft",
+  "edition": "draft-0",
+  "core_layer": "K0",
+  "status": "DRAFT",
+  "prd": "docs/prd/Aether-PRD-v0.3.md",
+  "reference_target": "targets/k0-reference-64.json",
+  "rule_index": "rules/K0.json",
+  "conformance_roots": [
+    "conformance/accept",
+    "conformance/reject",
+    "conformance/observe",
+    "conformance/metamorphic",
+    "conformance/historical"
+  ],
+  "open_blockers": [
+    "complete source parser and independent parser",
+    "complete ASR node schema and canonical serialization",
+    "complete Core expression and control-flow evaluator",
+    "normative borrow liveness algorithm",
+    "normative numeric widening algorithm",
+    "mechanized determinism, preservation, and progress proofs",
+    "independent B0 certificate checker",
+    "metamorphic corpus"
+  ]
+}

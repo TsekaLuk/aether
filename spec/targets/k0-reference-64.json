@@ -1,0 +1,30 @@
+{
+  "schema": "aether.target/k0-0.4",
+  "id": "k0-reference-64",
+  "status": "DRAFT",
+  "endianness": "little",
+  "usize_bits": 64,
+  "isize_bits": 64,
+  "stack": {
+    "limit_bytes": 1048576,
+    "overflow": "TARGET_FAULT:STACK_EXHAUSTED"
+  },
+  "allocators": [
+    {
+      "name": "main",
+      "brand": "brand:heap.main",
+      "capacity_parameter": "initial.allocators.main.capacity",
+      "capacity_max": 8,
+      "allocation_failure": "EXPLICIT_FAILURE:ALLOC-EXHAUSTED"
+    },
+    {
+      "name": "scratch",
+      "brand": "brand:heap.scratch",
+      "capacity_parameter": "initial.allocators.scratch.capacity",
+      "capacity_max": 2,
+      "allocation_failure": "EXPLICIT_FAILURE:ALLOC-EXHAUSTED"
+    }
+  ],
+  "host_primitives": ["alloc", "dealloc", "return", "target_fault"],
+  "forbidden_host_inputs": ["filesystem", "network", "clock", "entropy", "environment", "process"]
+}

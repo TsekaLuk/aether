@@ -1,0 +1,22 @@
+{
+  "schema_version": "aether.errors/k0-0.4",
+  "status": "DRAFT",
+  "errors": [
+    { "code": "PLACE-UNINITIALIZED", "phase": "static", "class": "REJECTED" },
+    { "code": "MOVE-BORROWED", "phase": "static", "class": "REJECTED" },
+    { "code": "MOVE-SOURCE-UNINITIALIZED", "phase": "static", "class": "REJECTED" },
+    { "code": "COPY-NONCOPY", "phase": "static", "class": "REJECTED" },
+    { "code": "BORROW-CONFLICT", "phase": "static", "class": "REJECTED" },
+    { "code": "BORROW-UNKNOWN", "phase": "static", "class": "REJECTED" },
+    { "code": "ALLOCATOR-UNKNOWN", "phase": "static", "class": "REJECTED" },
+    { "code": "ALLOC-BRAND-MISMATCH", "phase": "static", "class": "REJECTED" },
+    { "code": "ALLOC-EXHAUSTED", "phase": "runtime", "class": "EXPLICIT_FAILURE" },
+    { "code": "DEALLOC-NOT-OWNER", "phase": "static", "class": "REJECTED" },
+    { "code": "DEALLOC-BRAND-MISMATCH", "phase": "static", "class": "REJECTED" },
+    { "code": "DEALLOC-BORROWED", "phase": "static", "class": "REJECTED" },
+    { "code": "DEALLOC-DEAD", "phase": "static", "class": "REJECTED" },
+    { "code": "DROP-LEAK", "phase": "audit", "class": "DEFINED" },
+    { "code": "INTEGER-RANGE-UNPROVEN", "phase": "static", "class": "REJECTED" },
+    { "code": "CORE-MALFORMED", "phase": "decode", "class": "REJECTED" }
+  ]
+}

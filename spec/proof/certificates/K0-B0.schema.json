@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://aether.invalid/spec/0.4/proof/K0-B0.schema.json",
+  "title": "Aether K0 B0 evidence envelope",
+  "type": "object",
+  "required": ["schema", "spec_lock_hash", "core_hash", "obligations"],
+  "additionalProperties": false,
+  "properties": {
+    "schema": { "const": "aether.b0-evidence/k0-0.4" },
+    "spec_lock_hash": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+    "core_hash": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+    "obligations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "rule_id", "status"],
+        "properties": {
+          "id": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+          "rule_id": { "type": "string", "pattern": "^[A-Z][A-Z0-9-]+-[0-9]{3}$" },
+          "status": { "enum": ["PROVED_BY_B0", "REJECTED", "INTERNAL_INCOMPLETE"] },
+          "counterexample": { "type": "object" }
+        },
+        "additionalProperties": false
+      }
+    }
+  }
+}

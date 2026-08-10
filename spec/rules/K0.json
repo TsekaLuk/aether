@@ -1,0 +1,27 @@
+{
+  "schema": "aether.rule-index/0.4",
+  "status": "DRAFT",
+  "rules": [
+    { "id": "K0-PLACE-002", "domain": "static", "status": "DRAFT", "source": "core/static/K0.md", "tests": ["accept.move_once", "reject.use_after_move"] },
+    { "id": "K0-PLACE-003", "domain": "static", "status": "DRAFT", "source": "core/static/K0.md", "tests": ["reject.use_after_move", "reject.double_move"] },
+    { "id": "K0-BORROW-001", "domain": "static", "status": "DRAFT", "source": "core/static/K0.md", "tests": ["accept.shared_then_move"] },
+    { "id": "K0-BORROW-002", "domain": "static", "status": "DRAFT", "source": "core/static/K0.md", "tests": ["reject.mut_conflicts_shared", "reject.move_while_borrowed"] },
+    { "id": "K0-BORROW-003", "domain": "static", "status": "DRAFT", "source": "core/static/K0.md", "tests": ["reject.mut_conflicts_shared"] },
+    { "id": "K0-BORROW-004", "domain": "static", "status": "DRAFT", "source": "core/static/K0.md", "tests": ["accept.shared_then_move"] },
+    { "id": "K0-ALLOC-001", "domain": "dynamic", "status": "DRAFT", "source": "core/dynamic/K0.md", "tests": ["accept.alloc_dealloc", "observe.alloc_failure_returns_value"] },
+    { "id": "K0-ALLOC-002", "domain": "static", "status": "DRAFT", "source": "core/static/K0.md", "tests": ["reject.copy_owner"] },
+    { "id": "K0-ALLOC-003", "domain": "static", "status": "DRAFT", "source": "core/static/K0.md", "tests": ["reject.wrong_brand", "reject.dealloc_borrowed"] },
+    { "id": "K0-ALLOC-004", "domain": "dynamic", "status": "DRAFT", "source": "core/dynamic/K0.md", "tests": ["accept.alloc_dealloc", "reject.double_dealloc"] },
+    { "id": "K0-ALLOC-005", "domain": "dynamic", "status": "DRAFT", "source": "core/dynamic/K0.md", "tests": ["observe.drop_owner_leaks"] },
+    { "id": "K0-ALLOC-006", "domain": "metatheory", "status": "DRAFT", "source": "proof/logic/K0-theorems.md", "tests": ["reject.double_dealloc", "observe.drop_owner_leaks"] },
+    { "id": "K0-ALLOC-007", "domain": "memory", "status": "DRAFT", "source": "core/memory/K0.md", "tests": ["reject.wrong_brand"] },
+    { "id": "K0-ALLOC-008", "domain": "static", "status": "DRAFT", "source": "core/static/K0.md", "tests": ["accept.alloc_dealloc"] },
+    { "id": "K0-ALLOC-009", "domain": "metatheory", "status": "DRAFT", "source": "proof/logic/K0-theorems.md", "tests": ["observe.alloc_failure_returns_value"] },
+    { "id": "K0-ALLOC-010", "domain": "pipeline", "status": "DRAFT", "source": "core/memory/K0.md", "tests": ["reject.wrong_brand"] },
+    { "id": "MEM-OBJ-001", "domain": "memory", "status": "DRAFT", "source": "core/memory/K0.md", "tests": ["accept.two_fresh_allocations"] },
+    { "id": "MEM-OBJ-004", "domain": "memory", "status": "DRAFT", "source": "core/memory/K0.md", "tests": ["reject.double_dealloc"] },
+    { "id": "MEM-LIFE-002", "domain": "memory", "status": "DRAFT", "source": "core/memory/K0.md", "tests": ["observe.drop_owner_leaks"] },
+    { "id": "CONF-003", "domain": "conformance", "status": "DRAFT", "source": "conformance/README.md", "tests": ["accept.alloc_dealloc"] },
+    { "id": "CONF-004", "domain": "conformance", "status": "DRAFT", "source": "conformance/README.md", "tests": ["accept.move_once", "reject.use_after_move", "observe.drop_owner_leaks"] }
+  ]
+}

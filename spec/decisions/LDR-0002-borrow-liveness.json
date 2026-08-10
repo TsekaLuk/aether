@@ -1,0 +1,10 @@
+{
+  "schema": "aether.ldr/0.4",
+  "id": "LDR-0002",
+  "title": "K0 uses normalized control-flow liveness for borrows",
+  "status": "PROVISIONAL",
+  "basis": "Aether-PRD-v0.3 section 32.4",
+  "decision": "Borrow end points are determined by a normative backward liveness analysis, with field-sensitive and index-conservative overlap.",
+  "supersedes": [],
+  "rules": ["K0-BORROW-001", "K0-BORROW-002", "K0-BORROW-003", "K0-BORROW-004", "K0-BORROW-005", "K0-BORROW-006"]
+}

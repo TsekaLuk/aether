@@ -1,0 +1,54 @@
+{
+  "schema_version": "aether.vocabulary/0.4",
+  "status": "DRAFT",
+  "terms": [
+    {
+      "term": "value",
+      "definition": "A typed semantic result that can be copied only when its type has the closed K0 Copy property, otherwise moved."
+    },
+    {
+      "term": "place",
+      "definition": "A statically identifiable storage location and field or index path whose initialization and borrow state can be checked."
+    },
+    {
+      "term": "object",
+      "definition": "A typed subobject identified by an AllocationId and Path, with a storage duration and initialization state."
+    },
+    {
+      "term": "allocation",
+      "definition": "A dynamic storage instance created by alloc, assigned a fresh AllocationId, and invalidated only by dealloc."
+    },
+    {
+      "term": "owner",
+      "definition": "The unique place or transient evaluation position authorized to move or deallocate a non-Copy value."
+    },
+    {
+      "term": "borrow",
+      "definition": "A statically bounded permission to access a place or allocation without transferring ownership."
+    },
+    {
+      "term": "lifetime",
+      "definition": "The control-flow interval in which a reference permission is live and its referent remains valid."
+    },
+    {
+      "term": "allocator brand",
+      "definition": "An unforgeable nominal identity A binding Allocator<A> and every Own<T,A> created in that allocation domain."
+    },
+    {
+      "term": "effect",
+      "definition": "A declared class of externally observable or privileged action; effects are not part of K0 user signatures."
+    },
+    {
+      "term": "Capability",
+      "definition": "An unforgeable owned permission value introduced in K1, not ambient authority."
+    },
+    {
+      "term": "failure",
+      "definition": "One of REJECTED, EXPLICIT_FAILURE, TARGET_FAULT, UNSAFE_PRECONDITION, or EXTERNAL_ASSUMPTION; K0 runtime recovery uses explicit sum values."
+    },
+    {
+      "term": "observable",
+      "definition": "A returned value, explicit failure, declared target event, allocation event, deallocation event, or resource diagnostic admitted by the Core semantics."
+    }
+  ]
+}

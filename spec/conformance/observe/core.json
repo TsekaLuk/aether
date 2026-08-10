@@ -1,0 +1,52 @@
+[
+  {
+    "schema": "aether.core-transition/k0-0.4",
+    "id": "observe.alloc_failure_returns_value",
+    "rules": ["K0-ALLOC-001", "K0-ALLOC-009"],
+    "target": "k0-reference-64",
+    "initial": {
+      "places": {
+        "x": { "state": "initialized", "value": { "kind": "int", "type": "u32", "value": 99 } }
+      },
+      "allocators": {
+        "main": { "brand": "brand:heap.main", "capacity": 0 }
+      }
+    },
+    "steps": [
+      { "op": "alloc", "allocator": "main", "from": "x", "ok": "owner", "err": "failure", "allocation": "alloc:0" },
+      { "op": "use", "place": "failure" }
+    ],
+    "expect": {
+      "status": "ok",
+      "events": [
+        { "event": "alloc_failure", "brand": "brand:heap.main", "code": "ALLOC-EXHAUSTED" },
+        { "event": "use", "place": "failure", "value": { "kind": "alloc_error", "code": "ALLOC-EXHAUSTED", "returned": { "kind": "int", "type": "u32", "value": 99 } } }
+      ]
+    }
+  },
+  {
+    "schema": "aether.core-transition/k0-0.4",
+    "id": "observe.drop_owner_leaks",
+    "rules": ["K0-ALLOC-005", "K0-ALLOC-006", "MEM-LIFE-002", "CONF-004"],
+    "target": "k0-reference-64",
+    "initial": {
+      "places": {
+        "x": { "state": "initialized", "value": { "kind": "int", "type": "u16", "value": 12 } }
+      },
+      "allocators": {
+        "main": { "brand": "brand:heap.main", "capacity": 1 }
+      }
+    },
+    "steps": [
+      { "op": "alloc", "allocator": "main", "from": "x", "ok": "owner", "err": "failure", "allocation": "alloc:0" },
+      { "op": "drop", "place": "owner" }
+    ],
+    "expect": {
+      "status": "ok",
+      "events": [
+        { "event": "alloc", "allocation": "alloc:0", "brand": "brand:heap.main" },
+        { "event": "leak", "allocation": "alloc:0", "brand": "brand:heap.main", "code": "DROP-LEAK" }
+      ]
+    }
+  }
+]

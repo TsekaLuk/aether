@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://aether.invalid/spec/0.4/core/K0.schema.json",
+  "title": "Aether K0 semantic transition vector",
+  "type": "object",
+  "required": ["schema", "id", "rules", "target", "initial", "steps", "expect"],
+  "additionalProperties": false,
+  "properties": {
+    "schema": { "const": "aether.core-transition/k0-0.4" },
+    "id": { "type": "string", "pattern": "^[a-z][a-z0-9_.-]+$" },
+    "rules": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "type": "string", "pattern": "^[A-Z][A-Z0-9-]+-[0-9]{3}$" }
+    },
+    "target": { "const": "k0-reference-64" },
+    "initial": {
+      "type": "object",
+      "required": ["places", "allocators"],
+      "properties": {
+        "places": { "type": "object" },
+        "allocators": { "type": "object" }
+      },
+      "additionalProperties": false
+    },
+    "steps": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["op"],
+        "properties": {
+          "op": {
+            "enum": ["declare", "move", "copy", "use", "borrow", "end_borrow", "alloc", "dealloc", "drop"]
+          }
+        },
+        "additionalProperties": true
+      }
+    },
+    "expect": {
+      "type": "object",
+      "required": ["status"],
+      "properties": {
+        "status": { "enum": ["ok", "rejected"] },
+        "code": { "type": "string" },
+        "events": { "type": "array" }
+      },
+      "additionalProperties": false
+    }
+  }
+}
