@@ -1,4 +1,4 @@
-name = "aether-k0-proofs"
+name = "AetherProofs"
 version = "0.1.0"
 defaultTargets = ["AetherProofs"]
 

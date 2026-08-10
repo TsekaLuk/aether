@@ -1,6 +1,6 @@
 {"version": "1.2.0",
  "packagesDir": ".lake/packages",
  "packages": [],
- "name": "«aether-k0-proofs»",
+ "name": "AetherProofs",
  "lakeDir": ".lake",
  "fixedToolchain": false}

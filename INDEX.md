@@ -41,7 +41,7 @@ Links:
 Maintenance:
 
 - Run `npm test` after every normative or executable change; run `lake build` and
-  `lake env leanchecker AetherProofs` after proof changes.
+  `lake env leanchecker` after proof changes.
 - Update this index when meaningful files or project status change.
 - Promote durable implementation code to `workspace/code/` only after G0 passes.
 - Last reviewed: 2026-08-10.

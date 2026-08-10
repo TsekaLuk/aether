@@ -17,13 +17,13 @@
     },
     {
       "path": "lake-manifest.json",
-      "bytes": 152,
-      "sha256": "52273660d137daba8df78a1ff59c12f771f72cf22cc1d44379a44b6392471988"
+      "bytes": 144,
+      "sha256": "74a4e81754745362cb732ddd9de195bb1884d8d960262e3bd0000bfcc15cbc06"
     },
     {
       "path": "lakefile.toml",
-      "bytes": 147,
-      "sha256": "7f8c9a117584dc6c6019f92dbaac4192061124b450bfce3a27dde6d33fee752c"
+      "bytes": 143,
+      "sha256": "8f2447a4f6f9260cf727116bee629a05611a930b7a3c561b1e2a63d491d85e98"
     },
     {
       "path": "lean-toolchain",
@@ -32,8 +32,8 @@
     },
     {
       "path": "package.json",
-      "bytes": 535,
-      "sha256": "7fbb96f4c3397f32bf1556d011f25d964f33a1106f266f636fea2c5a936ecf97"
+      "bytes": 522,
+      "sha256": "14139c68a57f553359b8b8c0beae556c2c3c13d381ea3e9828aa1c994455824b"
     },
     {
       "path": "spec/README.md",
@@ -276,5 +276,5 @@
       "sha256": "374429a661267c95c5c0f40cd0dfce3cf8b5e35800506c1e3e03df4116147b6f"
     }
   ],
-  "root_hash": "46f9a2053162c447909045a2a9bcf1137c44106c2445ddcbee8628a3557def77"
+  "root_hash": "90981a12893eab5b439b6de3bd0a154e4fbe8a7a909ed46b074328aa70ce38f1"
 }

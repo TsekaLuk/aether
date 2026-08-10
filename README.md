@@ -73,7 +73,7 @@ Proof fragments use a separate locked toolchain:
 
 ```sh
 lake build
-lake env leanchecker AetherProofs
+lake env leanchecker
 ```
 
 CI additionally replays declarations with the independent Rust checker `nanoda`
